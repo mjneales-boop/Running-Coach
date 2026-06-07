@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { TrendArrow } from './ui/TrendArrow';
 import { readinessColor, readinessStatus, trendDir, readinessAdjustment } from '../lib/logic';
 import { ATHLETE } from '../constants/plan';
+import { useOura } from '../hooks/useOura';
 import type { ReadinessEntry } from '../types';
 
 interface ReadinessBandProps {
@@ -25,7 +27,6 @@ function ReadinessScaleBar({ score }: { score: number }) {
         <div style={{ width: '16.7%', height: '100%', background: 'rgba(245,158,11,0.55)' }} />
         <div style={{ width: '25%', height: '100%', background: 'rgba(0,217,255,0.55)' }} />
         <div style={{ width: '25%', height: '100%', background: 'rgba(16,185,129,0.55)', borderRadius: '0 4px 4px 0' }} />
-        {/* marker */}
         <div
           style={{
             position: 'absolute',
@@ -121,40 +122,124 @@ function MetricBig({ label, value, unit, baseline, higherIsBetter, isFirst }: Me
   );
 }
 
+function ghostBtn(extra?: React.CSSProperties): React.CSSProperties {
+  return {
+    fontFamily: 'var(--mono)',
+    fontSize: 12.5,
+    fontWeight: 500,
+    letterSpacing: '0.06em',
+    textTransform: 'lowercase',
+    color: 'var(--text-muted)',
+    background: 'transparent',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    padding: '6px 12px',
+    cursor: 'pointer',
+    transition: 'border-color 150ms ease, color 150ms ease',
+    whiteSpace: 'nowrap',
+    ...extra,
+  };
+}
+
 export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
+  const { connected, syncing, lastSynced, lastError, sync, connect, disconnect } = useOura();
+
+  // Auto-sync once on mount when connected (populates readiness automatically)
+  useEffect(() => {
+    if (connected === true) {
+      sync(30).catch(() => {});
+    }
+  }, [connected, sync]);
+
   const score = latestEntry.score;
   const color = readinessColor(score);
   const status = readinessStatus(score);
   const adjustment = readinessAdjustment(score);
 
-  const logButton = (
-    <button
-      onClick={onOpenLog}
-      style={{
-        fontFamily: 'var(--mono)',
-        fontSize: 12.5,
-        fontWeight: 500,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        color: 'var(--text-muted)',
-        background: 'transparent',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        padding: '6px 12px',
-        cursor: 'pointer',
-        transition: 'border-color 150ms ease, color 150ms ease',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-hover)';
-        (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
-        (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
-      }}
-    >
-      Log
-    </button>
+  const syncLabel = syncing ? 'syncing…' : 'sync now';
+
+  const lastSyncedLabel = lastSynced
+    ? `synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+
+  const ouraButtons = (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      {connected === null && (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>
+          …
+        </span>
+      )}
+      {connected === false && (
+        <button
+          onClick={connect}
+          style={ghostBtn()}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+          }}
+        >
+          connect oura
+        </button>
+      )}
+      {connected === true && (
+        <>
+          {lastSyncedLabel && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
+              {lastSyncedLabel}
+            </span>
+          )}
+          <button
+            onClick={() => sync(30).catch(() => {})}
+            disabled={syncing}
+            style={ghostBtn({ opacity: syncing ? 0.5 : 1, cursor: syncing ? 'default' : 'pointer' })}
+            onMouseEnter={(e) => {
+              if (!syncing) {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-hover)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+            }}
+          >
+            {syncLabel}
+          </button>
+          <button
+            onClick={disconnect}
+            style={ghostBtn()}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-hover)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+            }}
+          >
+            disconnect
+          </button>
+        </>
+      )}
+      <button
+        onClick={onOpenLog}
+        style={ghostBtn()}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-hover)';
+          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+          (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+        }}
+      >
+        log
+      </button>
+    </div>
   );
 
   return (
@@ -165,6 +250,7 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: 14,
+          gap: 12,
         }}
       >
         <span
@@ -175,12 +261,28 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
             letterSpacing: '0.02em',
             color: 'var(--text-muted)',
             textTransform: 'lowercase',
+            flexShrink: 0,
           }}
         >
           {'// readiness'}
         </span>
-        {logButton}
+        {ouraButtons}
       </div>
+
+      {/* Oura error banner */}
+      {lastError && (
+        <div
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 12,
+            color: 'var(--danger)',
+            marginBottom: 10,
+            letterSpacing: '0.02em',
+          }}
+        >
+          oura error: {lastError}
+        </div>
+      )}
 
       <div
         style={{
@@ -235,7 +337,6 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
             </div>
           </div>
 
-          {/* Scale bar */}
           {score != null && (
             <div style={{ flex: 1, paddingBottom: 14 }}>
               <ReadinessScaleBar score={score} />
@@ -243,7 +344,6 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
           )}
         </div>
 
-        {/* Adjustment suggestion */}
         {adjustment && (
           <div
             style={{
@@ -258,10 +358,8 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
           </div>
         )}
 
-        {/* Divider */}
         <div style={{ height: 1, background: 'var(--border)', margin: '24px 0 20px' }} />
 
-        {/* Metrics row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <MetricBig
             label="HRV"
