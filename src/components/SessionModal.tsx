@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Pill } from './ui/Pill';
 import { isHardSession } from '../lib/logic';
+import { guideEntriesForDay } from '../lib/coaching';
 import type { Week, Day, CompletionEntry, DayAbbr } from '../types';
 
 interface SessionModalProps {
@@ -197,6 +198,50 @@ export function SessionModal({
             <div style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)' }}>{day.notes}</div>
           </div>
         )}
+
+        {/* Coaching guide */}
+        {(() => {
+          const guides = guideEntriesForDay(day);
+          if (guides.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ height: 1, background: 'var(--border)', margin: '0 0 20px' }} />
+              {guides.map((g, gi) => (
+                <div key={g.key}>
+                  {gi > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '20px 0' }} />}
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.06em', marginBottom: 10 }}>
+                    {'// ' + g.label}
+                  </div>
+                  <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.5, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                    {g.oneLiner}
+                  </p>
+                  {(['what', 'why', 'how it should feel'] as const).map((h) => {
+                    const body = h === 'what' ? g.what : h === 'why' ? g.why : g.feel;
+                    return (
+                      <div key={h} style={{ marginBottom: 12 }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>{h}</div>
+                        <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>{body}</p>
+                      </div>
+                    );
+                  })}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>execute</div>
+                    <ul style={{ paddingLeft: 16, margin: 0 }}>
+                      {g.execute.map((cue, i) => (
+                        <li key={i} style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 2 }}>{cue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 5 }}>avoid</div>
+                    <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', fontStyle: 'italic', margin: 0 }}>{g.mistake}</p>
+                  </div>
+                </div>
+              ))}
+              <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 0' }} />
+            </div>
+          );
+        })()}
 
         {/* Notes textarea */}
         <div style={{ marginBottom: 18 }}>
