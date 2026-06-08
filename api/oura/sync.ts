@@ -63,12 +63,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Pick the longest sleep per day (ignores naps)
+    // Oura sleep sessions are keyed by the night-start date (e.g. a Jun 7→8 overnight sleep
+    // has day="2026-06-07"). Advance by 1 day so it aligns with the daily_readiness "wake date".
     const sleepByDay = new Map<string, SleepDoc>();
     for (const doc of sleepData.data) {
-      const existing = sleepByDay.get(doc.day);
+      const wakeDate = new Date(doc.day + 'T12:00:00Z');
+      wakeDate.setUTCDate(wakeDate.getUTCDate() + 1);
+      const wakeDay = wakeDate.toISOString().slice(0, 10);
+      const existing = sleepByDay.get(wakeDay);
       if (!existing || (doc.total_sleep_duration ?? 0) > (existing.total_sleep_duration ?? 0)) {
-        sleepByDay.set(doc.day, doc);
+        sleepByDay.set(wakeDay, doc);
       }
     }
 
