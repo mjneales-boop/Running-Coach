@@ -31,8 +31,17 @@ export function useReadiness(): UseReadiness {
   const todayEntry = useMemo(() => readiness[todayKey()] ?? {}, [readiness]);
 
   const latestEntry = useMemo(() => {
-    const keys = Object.keys(readiness).sort();
-    return keys.length ? readiness[keys[keys.length - 1]] : {};
+    const keys = Object.keys(readiness).sort().reverse();
+    const result: ReadinessEntry = {};
+    for (const k of keys) {
+      const e = readiness[k];
+      if (result.score == null && e.score != null) result.score = e.score;
+      if (result.hrv == null && e.hrv != null) result.hrv = e.hrv;
+      if (result.rhr == null && e.rhr != null) result.rhr = e.rhr;
+      if (result.sleep == null && e.sleep != null) result.sleep = e.sleep;
+      if (result.score != null && result.hrv != null && result.rhr != null && result.sleep != null) break;
+    }
+    return result;
   }, [readiness]);
 
   const recentEntries = useMemo(() => {
