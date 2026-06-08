@@ -63,16 +63,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Oura sleep sessions are keyed by the night-start date (e.g. a Jun 7→8 overnight sleep
-    // has day="2026-06-07"). Advance by 1 day so it aligns with the daily_readiness "wake date".
+    // Pick the longest sleep per day (ignores naps). Oura uses the wake date as day key,
+    // same convention as daily_readiness, so no offset needed.
     const sleepByDay = new Map<string, SleepDoc>();
     for (const doc of sleepData.data) {
-      const wakeDate = new Date(doc.day + 'T12:00:00Z');
-      wakeDate.setUTCDate(wakeDate.getUTCDate() + 1);
-      const wakeDay = wakeDate.toISOString().slice(0, 10);
-      const existing = sleepByDay.get(wakeDay);
+      const existing = sleepByDay.get(doc.day);
       if (!existing || (doc.total_sleep_duration ?? 0) > (existing.total_sleep_duration ?? 0)) {
-        sleepByDay.set(wakeDay, doc);
+        sleepByDay.set(doc.day, doc);
       }
     }
 
