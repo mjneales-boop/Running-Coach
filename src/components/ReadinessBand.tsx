@@ -7,6 +7,7 @@ import type { ReadinessEntry } from '../types';
 
 interface ReadinessBandProps {
   latestEntry: ReadinessEntry;
+  latestSleepDate: string | null;
   onOpenLog: () => void;
 }
 
@@ -141,7 +142,7 @@ function ghostBtn(extra?: React.CSSProperties): React.CSSProperties {
   };
 }
 
-export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
+export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: ReadinessBandProps) {
   const { connected, syncing, lastSynced, lastError, sync, connect, disconnect } = useOura();
 
   // Auto-sync once on mount when connected (populates readiness automatically)
@@ -155,6 +156,8 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
   const color = readinessColor(score);
   const status = readinessStatus(score);
   const adjustment = readinessAdjustment(score);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const sleepIsStale = latestSleepDate != null && latestSleepDate < todayStr;
 
   const syncLabel = syncing ? 'syncing…' : 'sync now';
 
@@ -384,6 +387,19 @@ export function ReadinessBand({ latestEntry, onOpenLog }: ReadinessBandProps) {
             higherIsBetter={true}
           />
         </div>
+        {sleepIsStale && (
+          <div
+            style={{
+              marginTop: 14,
+              fontFamily: 'var(--mono)',
+              fontSize: 11.5,
+              color: 'var(--text-muted)',
+              letterSpacing: '0.03em',
+            }}
+          >
+            sleep metrics from {latestSleepDate} · oura still processing last night · sync later to update
+          </div>
+        )}
       </div>
     </>
   );

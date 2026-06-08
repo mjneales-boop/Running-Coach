@@ -38,7 +38,7 @@ export default function App() {
     usePlan(today, viewedWeekIndex);
 
   const { completion, toggleDone, setNotes } = useCompletion();
-  const { latestEntry, logEntry } = useReadiness();
+  const { latestEntry, latestSleepDate, logEntry } = useReadiness();
 
   const todayKey = today.toISOString().slice(0, 10);
   const weekLabel = `${currentPhase.short.toLowerCase()} · wk ${currentWeek.num.toLowerCase()}`;
@@ -103,6 +103,7 @@ export default function App() {
         {/* Readiness */}
         <ReadinessBand
           latestEntry={latestEntry}
+          latestSleepDate={latestSleepDate}
           onOpenLog={() => setReadinessModalOpen(true)}
         />
         <div style={{ height: SEC_GAP }} />

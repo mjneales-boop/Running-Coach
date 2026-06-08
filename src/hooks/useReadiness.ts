@@ -10,6 +10,7 @@ interface UseReadiness {
   logEntry: (dateKey: string, entry: ReadinessEntry) => Promise<void>;
   todayEntry: ReadinessEntry;
   latestEntry: ReadinessEntry;
+  latestSleepDate: string | null;
   recentEntries: ReadinessEntry[];
 }
 
@@ -30,18 +31,19 @@ export function useReadiness(): UseReadiness {
 
   const todayEntry = useMemo(() => readiness[todayKey()] ?? {}, [readiness]);
 
-  const latestEntry = useMemo(() => {
+  const { latestEntry, latestSleepDate } = useMemo(() => {
     const keys = Object.keys(readiness).sort().reverse();
     const result: ReadinessEntry = {};
+    let sleepDate: string | null = null;
     for (const k of keys) {
       const e = readiness[k];
       if (result.score == null && e.score != null) result.score = e.score;
-      if (result.hrv == null && e.hrv != null) result.hrv = e.hrv;
+      if (result.hrv == null && e.hrv != null) { result.hrv = e.hrv; if (!sleepDate) sleepDate = k; }
       if (result.rhr == null && e.rhr != null) result.rhr = e.rhr;
       if (result.sleep == null && e.sleep != null) result.sleep = e.sleep;
       if (result.score != null && result.hrv != null && result.rhr != null && result.sleep != null) break;
     }
-    return result;
+    return { latestEntry: result, latestSleepDate: sleepDate };
   }, [readiness]);
 
   const recentEntries = useMemo(() => {
@@ -49,5 +51,5 @@ export function useReadiness(): UseReadiness {
     return keys.map((k) => readiness[k]);
   }, [readiness]);
 
-  return { readiness, loading, logEntry, todayEntry, latestEntry, recentEntries };
+  return { readiness, loading, logEntry, todayEntry, latestEntry, latestSleepDate, recentEntries };
 }
