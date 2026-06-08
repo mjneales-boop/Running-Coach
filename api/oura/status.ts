@@ -4,5 +4,6 @@ import { sessionOptions, type OuraSession } from '../../lib/session.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await getIronSession<OuraSession>(req, res, sessionOptions);
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ connected: !!session.accessToken });
 }

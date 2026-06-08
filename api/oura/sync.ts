@@ -82,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ data: result, range: { start: startStr, end: endStr } });
   } catch (e) {
     res.status(500).json({ error: String(e) });
