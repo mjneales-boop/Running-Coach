@@ -61,3 +61,6 @@ export interface ReadinessEntry {
 }
 
 export type ReadinessTier = 'excellent' | 'good' | 'yellow' | 'compromised' | 'red' | 'none';
+
+export type WeekContentMap = Partial<Record<DayAbbr, DayAbbr>>;
+export type SwapStore = Record<string, WeekContentMap>;

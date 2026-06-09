@@ -1,5 +1,5 @@
 import { ATHLETE, PHASES } from '../constants/plan';
-import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier } from '../types';
+import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap } from '../types';
 
 export function findCurrentWeek(today: Date, weeks: Week[]): Week {
   const t = today.toISOString().slice(0, 10);
@@ -79,6 +79,19 @@ export function weeklyKmDone(week: Week, completion: Record<string, CompletionEn
 
 export function currentPhase(week: Week): PhaseInfo {
   return PHASES.find((p) => p.num === week.phase)!;
+}
+
+export function applySwapsToWeek(week: Week, contentMap: WeekContentMap): Week {
+  if (!contentMap || Object.keys(contentMap).length === 0) return week;
+  const byAbbr = new Map(week.days.map((d) => [d.d, d]));
+  const days = week.days.map((pos) => {
+    const src = contentMap[pos.d] ?? pos.d;
+    if (src === pos.d) return pos;
+    const srcDay = byAbbr.get(src);
+    if (!srcDay) return pos;
+    return { ...srcDay, d: pos.d, date: pos.date };
+  });
+  return { ...week, days };
 }
 
 export function isHardSession(type: string): boolean {

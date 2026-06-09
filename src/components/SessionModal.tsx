@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Pill } from './ui/Pill';
 import { isHardSession } from '../lib/logic';
 import { guideEntriesForDay } from '../lib/coaching';
-import type { Week, Day, CompletionEntry, DayAbbr } from '../types';
+import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap } from '../types';
 
 interface SessionModalProps {
   weekId: string;
@@ -12,6 +12,8 @@ interface SessionModalProps {
   onToggleDone: (weekId: string, day: DayAbbr) => Promise<void>;
   onSetNotes: (weekId: string, day: DayAbbr, notes: string) => Promise<void>;
   onClose: () => void;
+  swapMap: WeekContentMap;
+  onSwapDay: (dayA: DayAbbr, dayB: DayAbbr) => void;
 }
 
 export function SessionModal({
@@ -22,6 +24,8 @@ export function SessionModal({
   onToggleDone,
   onSetNotes,
   onClose,
+  swapMap,
+  onSwapDay,
 }: SessionModalProps) {
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
@@ -271,6 +275,48 @@ export function SessionModal({
               onSetNotes(weekId, dayAbbr, (e.target as HTMLTextAreaElement).value);
             }}
           />
+        </div>
+
+        {/* Reschedule */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+              // reschedule
+            </span>
+            {swapMap[dayAbbr] && (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', letterSpacing: '0.03em' }}>
+                ↕ moved here from {swapMap[dayAbbr]!.toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {week.days
+              .filter((d) => d.d !== dayAbbr)
+              .map((d) => {
+                const isSwapPartner = swapMap[dayAbbr] === d.d;
+                return (
+                  <button
+                    key={d.d}
+                    onClick={() => onSwapDay(dayAbbr, d.d)}
+                    style={{
+                      fontFamily: 'var(--mono)',
+                      fontSize: 12,
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      border: `1px solid ${isSwapPartner ? 'var(--accent)' : 'var(--border)'}`,
+                      background: isSwapPartner ? 'rgba(0,217,255,0.08)' : 'var(--bg-3)',
+                      color: isSwapPartner ? 'var(--accent)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      letterSpacing: '0.04em',
+                      transition: 'border-color 150ms, color 150ms, background 150ms',
+                    }}
+                  >
+                    {d.d.toUpperCase()} · {d.type.toLowerCase()}
+                  </button>
+                );
+              })}
+          </div>
         </div>
 
         {/* If done, show completedAt */}

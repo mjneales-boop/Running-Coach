@@ -10,8 +10,9 @@ import { ReadinessModal } from './components/ReadinessModal';
 import { useCurrentDate } from './hooks/useCurrentDate';
 import { useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
+import { useSwaps } from './hooks/useSwaps';
 import { usePlan, WEEKS } from './hooks/usePlan';
-import { findCurrentWeekIndex } from './lib/logic';
+import { findCurrentWeekIndex, findTodaySession, applySwapsToWeek } from './lib/logic';
 import type { DayAbbr } from './types';
 
 interface SessionModalTarget {
@@ -34,11 +35,25 @@ export default function App() {
   const [sessionModal, setSessionModal] = useState<SessionModalTarget | null>(null);
   const [readinessModalOpen, setReadinessModalOpen] = useState(false);
 
-  const { currentWeek, viewedWeek, todaySession, currentPhase, daysToRace, currentWeekIndex } =
+  const { currentWeek, viewedWeek, currentPhase, daysToRace, currentWeekIndex } =
     usePlan(today, viewedWeekIndex);
 
   const { completion, toggleDone, setNotes } = useCompletion();
   const { latestEntry, latestSleepDate, logEntry } = useReadiness();
+  const { swaps, swapDays } = useSwaps();
+
+  const swappedCurrentWeek = useMemo(
+    () => applySwapsToWeek(currentWeek, swaps[currentWeek.id] ?? {}),
+    [currentWeek, swaps],
+  );
+  const swappedViewedWeek = useMemo(
+    () => applySwapsToWeek(viewedWeek, swaps[viewedWeek.id] ?? {}),
+    [viewedWeek, swaps],
+  );
+  const todaySession = useMemo(
+    () => findTodaySession(today, swappedCurrentWeek),
+    [today, swappedCurrentWeek],
+  );
 
   const todayKey = today.toISOString().slice(0, 10);
   const weekLabel = `${currentPhase.short.toLowerCase()} · wk ${currentWeek.num.toLowerCase()}`;
@@ -92,7 +107,7 @@ export default function App() {
           {`// today · ${weekLabel}`}
         </div>
         <TodayCard
-          week={currentWeek}
+          week={swappedCurrentWeek}
           day={todaySession}
           completion={completion}
           onToggleDone={toggleDone}
@@ -110,7 +125,7 @@ export default function App() {
 
         {/* Week Strip */}
         <WeekStrip
-          week={viewedWeek}
+          week={swappedViewedWeek}
           today={today}
           completion={completion}
           onDayClick={openSessionModal}
@@ -134,17 +149,23 @@ export default function App() {
       </div>
 
       {/* Session modal */}
-      {sessionModal && (
-        <SessionModal
-          weekId={sessionModal.weekId}
-          dayAbbr={sessionModal.dayAbbr}
-          week={WEEKS.find((w) => w.id === sessionModal.weekId)!}
-          completion={completion}
-          onToggleDone={toggleDone}
-          onSetNotes={setNotes}
-          onClose={() => setSessionModal(null)}
-        />
-      )}
+      {sessionModal && (() => {
+        const rawWeek = WEEKS.find((w) => w.id === sessionModal.weekId)!;
+        const modalWeek = applySwapsToWeek(rawWeek, swaps[sessionModal.weekId] ?? {});
+        return (
+          <SessionModal
+            weekId={sessionModal.weekId}
+            dayAbbr={sessionModal.dayAbbr}
+            week={modalWeek}
+            completion={completion}
+            onToggleDone={toggleDone}
+            onSetNotes={setNotes}
+            onClose={() => setSessionModal(null)}
+            swapMap={swaps[sessionModal.weekId] ?? {}}
+            onSwapDay={(a, b) => swapDays(sessionModal.weekId, a, b)}
+          />
+        );
+      })()}
 
       {/* Readiness modal */}
       {readinessModalOpen && (
