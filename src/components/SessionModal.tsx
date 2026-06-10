@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pill } from './ui/Pill';
+import { GymLogger } from './GymLogger';
 import { isHardSession } from '../lib/logic';
 import { guideEntriesForDay } from '../lib/coaching';
-import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap } from '../types';
+import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog } from '../types';
 
 interface SessionModalProps {
   weekId: string;
@@ -14,6 +15,9 @@ interface SessionModalProps {
   onClose: () => void;
   swapMap: WeekContentMap;
   onSwapDay: (dayA: DayAbbr, dayB: DayAbbr) => void;
+  strength: Record<string, WorkoutLog>;
+  onLogSet: (date: string, workoutId: string, exerciseId: string, setIndex: number, setLog: SetLog) => Promise<void>;
+  onMarkStrengthComplete: (date: string, workoutId: string) => Promise<void>;
 }
 
 export function SessionModal({
@@ -26,11 +30,20 @@ export function SessionModal({
   onClose,
   swapMap,
   onSwapDay,
+  strength,
+  onLogSet,
+  onMarkStrengthComplete,
 }: SessionModalProps) {
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
   const entry = completion[sessionKey] ?? { done: false };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const hasCardio = day ? ['LONG', 'WORKOUT', 'EASY', 'BIKE'].includes(day.type) : false;
+  const hasGym = !!day?.workoutId;
+  const showTabs = hasCardio && hasGym;
+  const runLabel = day?.type === 'BIKE' ? 'bike' : 'run';
+  const [activeTab, setActiveTab] = useState<'run' | 'gym'>('run');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -99,7 +112,7 @@ export function SessionModal({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 18,
+            marginBottom: showTabs ? 0 : 18,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -131,222 +144,267 @@ export function SessionModal({
           </button>
         </div>
 
-        {/* Title */}
-        <div
-          style={{
-            fontFamily: 'var(--sans)',
-            fontWeight: 900,
-            fontSize: 28,
-            letterSpacing: '-0.02em',
-            lineHeight: 1.1,
-            color: 'var(--text)',
-            marginBottom: 20,
-          }}
-        >
-          {day.title}
-        </div>
-
-        {/* Stats */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 16,
-            marginBottom: 18,
-          }}
-        >
-          {day.km != null && (
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Distance</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.km} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>km</span></div>
-            </div>
-          )}
-          {day.duration != null && (
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Duration</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.duration} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>min</span></div>
-            </div>
-          )}
-          {day.pace && (
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Pace</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.pace} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>/km</span></div>
-            </div>
-          )}
-          {day.strides && (
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Strides</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.strides}</div>
-            </div>
-          )}
-          {day.gym && (
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Gym</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.gym}</div>
-            </div>
-          )}
-        </div>
-
-        {/* Coach note */}
-        {day.notes && (
-          <div
-            style={{
-              background: 'var(--bg-3)',
-              borderLeft: `2px solid ${hard ? 'var(--accent)' : 'var(--border-hover)'}`,
-              borderRadius: '0 8px 8px 0',
-              padding: '12px 16px',
-              marginBottom: 18,
-            }}
-          >
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>// coach</div>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)' }}>{day.notes}</div>
+        {/* Tabs */}
+        {showTabs && (
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 18, marginTop: 14 }}>
+            {([runLabel, 'gym'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab === runLabel ? 'run' : 'gym')}
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 13,
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: (tab === runLabel ? activeTab === 'run' : activeTab === 'gym') ? 'var(--accent)' : 'var(--text-muted)',
+                  borderBottom: (tab === runLabel ? activeTab === 'run' : activeTab === 'gym') ? '2px solid var(--accent)' : '2px solid transparent',
+                  marginBottom: '-1px',
+                  letterSpacing: '0.04em',
+                  transition: 'color 150ms, border-color 150ms',
+                }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         )}
 
-        {/* Coaching guide */}
-        {(() => {
-          const guides = guideEntriesForDay(day);
-          if (guides.length === 0) return null;
-          return (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ height: 1, background: 'var(--border)', margin: '0 0 20px' }} />
-              {guides.map((g, gi) => (
-                <div key={g.key}>
-                  {gi > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '20px 0' }} />}
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.06em', marginBottom: 10 }}>
-                    {'// ' + g.label}
-                  </div>
-                  <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.5, color: 'var(--text-dim)', margin: '0 0 14px' }}>
-                    {g.oneLiner}
-                  </p>
-                  {(['what', 'why', 'how it should feel'] as const).map((h) => {
-                    const body = h === 'what' ? g.what : h === 'why' ? g.why : g.feel;
-                    return (
-                      <div key={h} style={{ marginBottom: 12 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>{h}</div>
-                        <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>{body}</p>
+        {/* Run / Cardio tab content */}
+        {(!showTabs || activeTab === 'run') && (
+          <>
+            {/* Title */}
+            <div
+              style={{
+                fontFamily: 'var(--sans)',
+                fontWeight: 900,
+                fontSize: 28,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.1,
+                color: 'var(--text)',
+                marginBottom: 20,
+              }}
+            >
+              {day.title}
+            </div>
+
+            {/* Stats */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 16,
+                marginBottom: 18,
+              }}
+            >
+              {day.km != null && (
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Distance</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.km} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>km</span></div>
+                </div>
+              )}
+              {day.duration != null && (
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Duration</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.duration} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>min</span></div>
+                </div>
+              )}
+              {day.pace && (
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Pace</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.pace} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>/km</span></div>
+                </div>
+              )}
+              {day.strides && (
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Strides</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.strides}</div>
+                </div>
+              )}
+              {day.gym && (
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Gym</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.gym}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Coach note */}
+            {day.notes && (
+              <div
+                style={{
+                  background: 'var(--bg-3)',
+                  borderLeft: `2px solid ${hard ? 'var(--accent)' : 'var(--border-hover)'}`,
+                  borderRadius: '0 8px 8px 0',
+                  padding: '12px 16px',
+                  marginBottom: 18,
+                }}
+              >
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>// coach</div>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)' }}>{day.notes}</div>
+              </div>
+            )}
+
+            {/* Coaching guide */}
+            {(() => {
+              const guides = guideEntriesForDay(day);
+              if (guides.length === 0) return null;
+              return (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '0 0 20px' }} />
+                  {guides.map((g, gi) => (
+                    <div key={g.key}>
+                      {gi > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '20px 0' }} />}
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.06em', marginBottom: 10 }}>
+                        {'// ' + g.label}
                       </div>
+                      <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.5, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                        {g.oneLiner}
+                      </p>
+                      {(['what', 'why', 'how it should feel'] as const).map((h) => {
+                        const body = h === 'what' ? g.what : h === 'why' ? g.why : g.feel;
+                        return (
+                          <div key={h} style={{ marginBottom: 12 }}>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>{h}</div>
+                            <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>{body}</p>
+                          </div>
+                        );
+                      })}
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>execute</div>
+                        <ul style={{ paddingLeft: 16, margin: 0 }}>
+                          {g.execute.map((cue, i) => (
+                            <li key={i} style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 2 }}>{cue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 5 }}>avoid</div>
+                        <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', fontStyle: 'italic', margin: 0 }}>{g.mistake}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 0' }} />
+                </div>
+              );
+            })()}
+
+            {/* Notes textarea */}
+            <div style={{ marginBottom: 18 }}>
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                  marginBottom: 8,
+                }}
+              >
+                Your Notes
+              </div>
+              <textarea
+                ref={textareaRef}
+                placeholder="How did it go? HR, effort, notes..."
+                style={{
+                  ...inputStyle,
+                  lineHeight: 1.6,
+                }}
+                onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border-hover)'; }}
+                onBlur={(e) => {
+                  (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)';
+                  onSetNotes(weekId, dayAbbr, (e.target as HTMLTextAreaElement).value);
+                }}
+              />
+            </div>
+
+            {/* Reschedule */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                  // reschedule
+                </span>
+                {swapMap[dayAbbr] && (
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', letterSpacing: '0.03em' }}>
+                    ↕ moved here from {swapMap[dayAbbr]!.toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {week.days
+                  .filter((d) => d.d !== dayAbbr)
+                  .map((d) => {
+                    const isSwapPartner = swapMap[dayAbbr] === d.d;
+                    return (
+                      <button
+                        key={d.d}
+                        onClick={() => onSwapDay(dayAbbr, d.d)}
+                        style={{
+                          fontFamily: 'var(--mono)',
+                          fontSize: 12,
+                          padding: '6px 12px',
+                          borderRadius: 6,
+                          border: `1px solid ${isSwapPartner ? 'var(--accent)' : 'var(--border)'}`,
+                          background: isSwapPartner ? 'rgba(0,217,255,0.08)' : 'var(--bg-3)',
+                          color: isSwapPartner ? 'var(--accent)' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                          letterSpacing: '0.04em',
+                          transition: 'border-color 150ms, color 150ms, background 150ms',
+                        }}
+                      >
+                        {d.d.toUpperCase()} · {d.type.toLowerCase()}
+                      </button>
                     );
                   })}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>execute</div>
-                    <ul style={{ paddingLeft: 16, margin: 0 }}>
-                      {g.execute.map((cue, i) => (
-                        <li key={i} style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 2 }}>{cue}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 5 }}>avoid</div>
-                    <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', fontStyle: 'italic', margin: 0 }}>{g.mistake}</p>
-                  </div>
-                </div>
-              ))}
-              <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 0' }} />
+              </div>
             </div>
-          );
-        })()}
 
-        {/* Notes textarea */}
-        <div style={{ marginBottom: 18 }}>
-          <div
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 11.5,
-              fontWeight: 500,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-              marginBottom: 8,
-            }}
-          >
-            Your Notes
-          </div>
-          <textarea
-            ref={textareaRef}
-            placeholder="How did it go? HR, effort, notes..."
-            style={{
-              ...inputStyle,
-              lineHeight: 1.6,
-            }}
-            onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border-hover)'; }}
-            onBlur={(e) => {
-              (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)';
-              onSetNotes(weekId, dayAbbr, (e.target as HTMLTextAreaElement).value);
-            }}
-          />
-        </div>
-
-        {/* Reschedule */}
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
-              // reschedule
-            </span>
-            {swapMap[dayAbbr] && (
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', letterSpacing: '0.03em' }}>
-                ↕ moved here from {swapMap[dayAbbr]!.toUpperCase()}
-              </span>
+            {/* If done, show completedAt */}
+            {entry.done && entry.completedAt && (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--success)', marginBottom: 16 }}>
+                ✓ Completed {new Date(entry.completedAt).toLocaleString()}
+              </div>
             )}
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {week.days
-              .filter((d) => d.d !== dayAbbr)
-              .map((d) => {
-                const isSwapPartner = swapMap[dayAbbr] === d.d;
-                return (
-                  <button
-                    key={d.d}
-                    onClick={() => onSwapDay(dayAbbr, d.d)}
-                    style={{
-                      fontFamily: 'var(--mono)',
-                      fontSize: 12,
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      border: `1px solid ${isSwapPartner ? 'var(--accent)' : 'var(--border)'}`,
-                      background: isSwapPartner ? 'rgba(0,217,255,0.08)' : 'var(--bg-3)',
-                      color: isSwapPartner ? 'var(--accent)' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      letterSpacing: '0.04em',
-                      transition: 'border-color 150ms, color 150ms, background 150ms',
-                    }}
-                  >
-                    {d.d.toUpperCase()} · {d.type.toLowerCase()}
-                  </button>
-                );
-              })}
-          </div>
-        </div>
 
-        {/* If done, show completedAt */}
-        {entry.done && entry.completedAt && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--success)', marginBottom: 16 }}>
-            ✓ Completed {new Date(entry.completedAt).toLocaleString()}
-          </div>
+            {/* Mark complete button */}
+            <button
+              onClick={() => onToggleDone(weekId, dayAbbr)}
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                borderRadius: 8,
+                padding: '14px 22px',
+                cursor: 'pointer',
+                border: `1px solid ${entry.done ? 'var(--success)' : 'var(--accent)'}`,
+                background: entry.done ? 'var(--success)' : 'var(--accent)',
+                color: '#04222A',
+                transition: 'background 150ms ease, border-color 150ms ease',
+                width: '100%',
+              }}
+            >
+              {entry.done ? '✓ Completed — Undo' : 'Mark Complete'}
+            </button>
+          </>
         )}
 
-        {/* Mark complete button */}
-        <button
-          onClick={() => onToggleDone(weekId, dayAbbr)}
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 13,
-            fontWeight: 600,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            borderRadius: 8,
-            padding: '14px 22px',
-            cursor: 'pointer',
-            border: `1px solid ${entry.done ? 'var(--success)' : 'var(--accent)'}`,
-            background: entry.done ? 'var(--success)' : 'var(--accent)',
-            color: '#04222A',
-            transition: 'background 150ms ease, border-color 150ms ease',
-            width: '100%',
-          }}
-        >
-          {entry.done ? '✓ Completed — Undo' : 'Mark Complete'}
-        </button>
+        {/* Gym tab content */}
+        {showTabs && activeTab === 'gym' && (
+          <GymLogger
+            day={day}
+            weekId={weekId}
+            strength={strength}
+            onLogSet={onLogSet}
+            onMarkComplete={onMarkStrengthComplete}
+            onToggleDone={onToggleDone}
+            completion={completion}
+          />
+        )}
       </div>
     </div>
   );

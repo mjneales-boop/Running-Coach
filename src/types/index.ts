@@ -12,6 +12,7 @@ export interface Day {
   pace?: string;
   strides?: string;
   gym?: string;
+  workoutId?: string;
   notes?: string;
 }
 
@@ -64,3 +65,16 @@ export type ReadinessTier = 'excellent' | 'good' | 'yellow' | 'compromised' | 'r
 
 export type WeekContentMap = Partial<Record<DayAbbr, DayAbbr>>;
 export type SwapStore = Record<string, WeekContentMap>;
+
+export interface SetLog {
+  weight?: number;
+  reps?: number;
+  done?: boolean;
+}
+
+export interface WorkoutLog {
+  workoutId: string;
+  date: string;
+  exercises: Record<string, SetLog[]>;
+  completedAt?: string;
+}

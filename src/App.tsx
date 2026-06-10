@@ -7,10 +7,12 @@ import { Timeline } from './components/Timeline';
 import { PacingZones } from './components/PacingZones';
 import { SessionModal } from './components/SessionModal';
 import { ReadinessModal } from './components/ReadinessModal';
+import { StrengthView } from './components/StrengthView';
 import { useCurrentDate } from './hooks/useCurrentDate';
 import { useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
 import { useSwaps } from './hooks/useSwaps';
+import { useStrength } from './hooks/useStrength';
 import { usePlan, WEEKS } from './hooks/usePlan';
 import { findCurrentWeekIndex, findTodaySession, applySwapsToWeek } from './lib/logic';
 import type { DayAbbr } from './types';
@@ -31,6 +33,7 @@ export default function App() {
     [],
   );
 
+  const [view, setView] = useState<'dashboard' | 'strength'>('dashboard');
   const [viewedWeekIndex, setViewedWeekIndex] = useState(initialWeekIndex);
   const [sessionModal, setSessionModal] = useState<SessionModalTarget | null>(null);
   const [readinessModalOpen, setReadinessModalOpen] = useState(false);
@@ -41,6 +44,7 @@ export default function App() {
   const { completion, toggleDone, setNotes } = useCompletion();
   const { latestEntry, latestSleepDate, logEntry } = useReadiness();
   const { swaps, swapDays } = useSwaps();
+  const { strength, logSet, markComplete: markStrengthComplete } = useStrength();
 
   const swappedCurrentWeek = useMemo(
     () => applySwapsToWeek(currentWeek, swaps[currentWeek.id] ?? {}),
@@ -90,62 +94,93 @@ export default function App() {
       >
         {/* Header */}
         <Header today={today} daysToRace={daysToRace} />
-        <div style={{ height: SEC_GAP }} />
+        <div style={{ height: 24 }} />
 
-        {/* Today Card */}
-        <div
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 14,
-            fontWeight: 500,
-            letterSpacing: '0.02em',
-            color: 'var(--text-muted)',
-            textTransform: 'lowercase',
-            marginBottom: 14,
-          }}
-        >
-          {`// today · ${weekLabel}`}
+        {/* View nav */}
+        <div style={{ display: 'flex', gap: 24, marginBottom: SEC_GAP, fontFamily: 'var(--mono)', fontSize: 13 }}>
+          {(['dashboard', 'strength'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                color: view === v ? 'var(--text)' : 'var(--text-muted)',
+                letterSpacing: '0.04em',
+                fontFamily: 'var(--mono)',
+                fontSize: 13,
+                transition: 'color 150ms',
+              }}
+            >
+              {'// ' + v}
+            </button>
+          ))}
         </div>
-        <TodayCard
-          week={swappedCurrentWeek}
-          day={todaySession}
-          completion={completion}
-          onToggleDone={toggleDone}
-          onOpenModal={openTodayModal}
-        />
-        <div style={{ height: SEC_GAP }} />
 
-        {/* Readiness */}
-        <ReadinessBand
-          latestEntry={latestEntry}
-          latestSleepDate={latestSleepDate}
-          onOpenLog={() => setReadinessModalOpen(true)}
-        />
-        <div style={{ height: SEC_GAP }} />
+        {/* Dashboard view */}
+        {view === 'dashboard' && (
+          <>
+            {/* Today Card */}
+            <div
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: '0.02em',
+                color: 'var(--text-muted)',
+                textTransform: 'lowercase',
+                marginBottom: 14,
+              }}
+            >
+              {`// today · ${weekLabel}`}
+            </div>
+            <TodayCard
+              week={swappedCurrentWeek}
+              day={todaySession}
+              completion={completion}
+              onToggleDone={toggleDone}
+              onOpenModal={openTodayModal}
+            />
+            <div style={{ height: SEC_GAP }} />
 
-        {/* Week Strip */}
-        <WeekStrip
-          week={swappedViewedWeek}
-          today={today}
-          completion={completion}
-          onDayClick={openSessionModal}
-          onPrev={handlePrevWeek}
-          onToday={handleTodayWeek}
-          onNext={handleNextWeek}
-        />
-        <div style={{ height: SEC_GAP }} />
+            {/* Readiness */}
+            <ReadinessBand
+              latestEntry={latestEntry}
+              latestSleepDate={latestSleepDate}
+              onOpenLog={() => setReadinessModalOpen(true)}
+            />
+            <div style={{ height: SEC_GAP }} />
 
-        {/* Timeline */}
-        <Timeline
-          completion={completion}
-          currentWeekIndex={currentWeekIndex}
-          viewedWeekIndex={viewedWeekIndex}
-          onWeekClick={setViewedWeekIndex}
-        />
-        <div style={{ height: SEC_GAP }} />
+            {/* Week Strip */}
+            <WeekStrip
+              week={swappedViewedWeek}
+              today={today}
+              completion={completion}
+              onDayClick={openSessionModal}
+              onPrev={handlePrevWeek}
+              onToday={handleTodayWeek}
+              onNext={handleNextWeek}
+            />
+            <div style={{ height: SEC_GAP }} />
 
-        {/* Pacing Zones */}
-        <PacingZones />
+            {/* Timeline */}
+            <Timeline
+              completion={completion}
+              currentWeekIndex={currentWeekIndex}
+              viewedWeekIndex={viewedWeekIndex}
+              onWeekClick={setViewedWeekIndex}
+            />
+            <div style={{ height: SEC_GAP }} />
+
+            {/* Pacing Zones */}
+            <PacingZones />
+          </>
+        )}
+
+        {/* Strength view */}
+        {view === 'strength' && <StrengthView strength={strength} />}
       </div>
 
       {/* Session modal */}
@@ -163,6 +198,9 @@ export default function App() {
             onClose={() => setSessionModal(null)}
             swapMap={swaps[sessionModal.weekId] ?? {}}
             onSwapDay={(a, b) => swapDays(sessionModal.weekId, a, b)}
+            strength={strength}
+            onLogSet={logSet}
+            onMarkStrengthComplete={markStrengthComplete}
           />
         );
       })()}
