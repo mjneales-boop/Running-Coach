@@ -26,6 +26,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   );
 
   if (!r.ok) {
+    if (r.status === 429) {
+      return res.status(429).json({ error: 'rate limit — try again in 15 min' });
+    }
     return res.status(502).json({ error: 'Strava API error', status: r.status });
   }
 

@@ -164,9 +164,12 @@ export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: Readi
 
   useEffect(() => {
     if (stravaConnected === true) {
-      stravaSync(7).catch(() => {});
+      const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
+      if (!stravaLastSynced || stravaLastSynced.getTime() < fifteenMinAgo) {
+        stravaSync(7).catch(() => {});
+      }
     }
-  }, [stravaConnected, stravaSync]);
+  }, [stravaConnected, stravaSync, stravaLastSynced]);
 
   const score = latestEntry.score;
   const color = readinessColor(score);

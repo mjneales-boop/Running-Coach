@@ -11,6 +11,8 @@ interface StravaSyncResponse {
   data: StravaMap;
 }
 
+const SYNC_TS_KEY = 'marathon-strava-synced';
+
 function formatPace(avgPaceMinKm: number): string {
   const totalSec = Math.round(avgPaceMinKm * 60);
   return `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
@@ -19,7 +21,12 @@ function formatPace(avgPaceMinKm: number): string {
 export function useStrava() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [lastSynced, setLastSynced] = useState<Date | null>(() => {
+    try {
+      const ts = localStorage.getItem(SYNC_TS_KEY);
+      return ts ? new Date(Number(ts)) : null;
+    } catch { return null; }
+  });
   const [lastError, setLastError] = useState<string | null>(null);
   const { setActual } = useCompletion();
 
@@ -67,8 +74,12 @@ export function useStrava() {
       try {
         const res = await fetch(`/api/strava/sync?days=${days}`);
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `HTTP ${res.status}`);
+          let msg = `HTTP ${res.status}`;
+          try {
+            const errJson = await res.json() as { error?: string };
+            if (errJson.error) msg = errJson.error;
+          } catch {}
+          throw new Error(msg);
         }
 
         const { data }: StravaSyncResponse = await res.json();
@@ -89,7 +100,9 @@ export function useStrava() {
 
         await autoComplete(merged);
 
-        setLastSynced(new Date());
+        const now = new Date();
+        setLastSynced(now);
+        try { localStorage.setItem(SYNC_TS_KEY, String(now.getTime())); } catch {}
         return merged;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
