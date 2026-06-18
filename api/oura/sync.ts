@@ -25,9 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const days = Math.min(90, Math.max(1, Number(req.query.days ?? 30)));
   const end = new Date();
+  const endWithBuffer = new Date(end.getTime() + 86_400_000);
   const start = new Date(end.getTime() - days * 86_400_000);
   const startStr = start.toISOString().slice(0, 10);
-  const endStr = end.toISOString().slice(0, 10);
+  const endStr = endWithBuffer.toISOString().slice(0, 10);
 
   const headers = { Authorization: `Bearer ${token}` };
 

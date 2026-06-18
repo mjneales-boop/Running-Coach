@@ -1,8 +1,15 @@
 import { ATHLETE, PHASES } from '../constants/plan';
 import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap } from '../types';
 
+function localDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function findCurrentWeek(today: Date, weeks: Week[]): Week {
-  const t = today.toISOString().slice(0, 10);
+  const t = localDateStr(today);
   for (const w of weeks) {
     if (t >= w.dateStart && t <= w.dateEnd) return w;
   }
@@ -11,7 +18,7 @@ export function findCurrentWeek(today: Date, weeks: Week[]): Week {
 }
 
 export function findCurrentWeekIndex(today: Date, weeks: Week[]): number {
-  const t = today.toISOString().slice(0, 10);
+  const t = localDateStr(today);
   for (let i = 0; i < weeks.length; i++) {
     if (t >= weeks[i].dateStart && t <= weeks[i].dateEnd) return i;
   }
@@ -20,7 +27,7 @@ export function findCurrentWeekIndex(today: Date, weeks: Week[]): number {
 }
 
 export function findTodaySession(today: Date, week: Week): Day | undefined {
-  const t = today.toISOString().slice(0, 10);
+  const t = localDateStr(today);
   return week.days.find((d) => d.date === t);
 }
 

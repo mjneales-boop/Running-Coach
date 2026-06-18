@@ -3,6 +3,7 @@ import { TrendArrow } from './ui/TrendArrow';
 import { readinessColor, readinessStatus, trendDir, readinessAdjustment } from '../lib/logic';
 import { ATHLETE } from '../constants/plan';
 import { useOura } from '../hooks/useOura';
+import { useStrava } from '../hooks/useStrava';
 import type { ReadinessEntry } from '../types';
 
 interface ReadinessBandProps {
@@ -144,13 +145,28 @@ function ghostBtn(extra?: React.CSSProperties): React.CSSProperties {
 
 export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: ReadinessBandProps) {
   const { connected, syncing, lastSynced, lastError, sync, connect, disconnect } = useOura();
+  const {
+    connected: stravaConnected,
+    syncing: stravaSyncing,
+    lastSynced: stravaLastSynced,
+    lastError: stravaLastError,
+    sync: stravaSync,
+    connect: stravaConnect,
+    disconnect: stravaDisconnect,
+  } = useStrava();
 
-  // Auto-sync once on mount when connected (populates readiness automatically)
+  // Auto-sync both on mount when connected
   useEffect(() => {
     if (connected === true) {
-      sync(30).catch(() => {});
+      sync(7).catch(() => {});
     }
   }, [connected, sync]);
+
+  useEffect(() => {
+    if (stravaConnected === true) {
+      stravaSync(7).catch(() => {});
+    }
+  }, [stravaConnected, stravaSync]);
 
   const score = latestEntry.score;
   const color = readinessColor(score);
@@ -164,6 +180,73 @@ export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: Readi
   const lastSyncedLabel = lastSynced
     ? `synced ${lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : null;
+
+  const stravaSyncLabel = stravaSyncing ? 'syncing…' : 'sync now';
+  const stravaLastSyncedLabel = stravaLastSynced
+    ? `synced ${stravaLastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+
+  const stravaButtons = (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      {stravaConnected === null && (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>…</span>
+      )}
+      {stravaConnected === false && (
+        <button
+          onClick={stravaConnect}
+          style={ghostBtn({ borderColor: 'rgba(252,76,2,0.4)', color: '#FC4C02' })}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = '#FC4C02';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(252,76,2,0.4)';
+          }}
+        >
+          connect strava
+        </button>
+      )}
+      {stravaConnected === true && (
+        <>
+          {stravaLastSyncedLabel && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
+              {stravaLastSyncedLabel}
+            </span>
+          )}
+          <button
+            onClick={() => stravaSync(30).catch(() => {})}
+            disabled={stravaSyncing}
+            style={ghostBtn({ opacity: stravaSyncing ? 0.5 : 1, cursor: stravaSyncing ? 'default' : 'pointer' })}
+            onMouseEnter={(e) => {
+              if (!stravaSyncing) {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-hover)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+            }}
+          >
+            {stravaSyncLabel}
+          </button>
+          <button
+            onClick={stravaDisconnect}
+            style={ghostBtn()}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-hover)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-dim)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+            }}
+          >
+            disconnect
+          </button>
+        </>
+      )}
+    </div>
+  );
 
   const ouraButtons = (
     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -284,6 +367,47 @@ export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: Readi
           }}
         >
           oura error: {lastError}
+        </div>
+      )}
+
+      {/* Strava row */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: stravaLastError ? 4 : 14,
+          gap: 12,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 14,
+            fontWeight: 500,
+            letterSpacing: '0.02em',
+            color: stravaConnected ? '#FC4C02' : 'var(--text-muted)',
+            textTransform: 'lowercase',
+            flexShrink: 0,
+          }}
+        >
+          {'// strava'}
+        </span>
+        {stravaButtons}
+      </div>
+
+      {/* Strava error banner */}
+      {stravaLastError && (
+        <div
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 12,
+            color: 'var(--danger)',
+            marginBottom: 14,
+            letterSpacing: '0.02em',
+          }}
+        >
+          strava error: {stravaLastError}
         </div>
       )}
 

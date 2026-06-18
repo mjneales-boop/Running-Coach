@@ -13,9 +13,10 @@ import { useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
 import { useSwaps } from './hooks/useSwaps';
 import { useStrength } from './hooks/useStrength';
+import { useStorage } from './hooks/useStorage';
 import { usePlan, WEEKS } from './hooks/usePlan';
 import { findCurrentWeekIndex, findTodaySession, applySwapsToWeek } from './lib/logic';
-import type { DayAbbr } from './types';
+import type { DayAbbr, StravaActivity } from './types';
 
 interface SessionModalTarget {
   weekId: string;
@@ -45,6 +46,7 @@ export default function App() {
   const { latestEntry, latestSleepDate, logEntry } = useReadiness();
   const { swaps, swapDays } = useSwaps();
   const { strength, logSet, markComplete: markStrengthComplete } = useStrength();
+  const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
 
   const swappedCurrentWeek = useMemo(
     () => applySwapsToWeek(currentWeek, swaps[currentWeek.id] ?? {}),
@@ -59,7 +61,7 @@ export default function App() {
     [today, swappedCurrentWeek],
   );
 
-  const todayKey = today.toISOString().slice(0, 10);
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const weekLabel = `${currentPhase.short.toLowerCase()} · wk ${currentWeek.num.toLowerCase()}`;
 
   const handlePrevWeek = () => setViewedWeekIndex((i) => Math.max(0, i - 1));
@@ -201,6 +203,7 @@ export default function App() {
             strength={strength}
             onLogSet={logSet}
             onMarkStrengthComplete={markStrengthComplete}
+            stravaActivities={stravaActivities}
           />
         );
       })()}

@@ -3,7 +3,7 @@ import { Pill } from './ui/Pill';
 import { GymLogger } from './GymLogger';
 import { isHardSession } from '../lib/logic';
 import { guideEntriesForDay } from '../lib/coaching';
-import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog } from '../types';
+import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog, StravaActivity } from '../types';
 
 interface SessionModalProps {
   weekId: string;
@@ -18,6 +18,7 @@ interface SessionModalProps {
   strength: Record<string, WorkoutLog>;
   onLogSet: (date: string, workoutId: string, exerciseId: string, setIndex: number, setLog: SetLog) => Promise<void>;
   onMarkStrengthComplete: (date: string, workoutId: string) => Promise<void>;
+  stravaActivities?: Record<string, StravaActivity>;
 }
 
 export function SessionModal({
@@ -33,6 +34,7 @@ export function SessionModal({
   strength,
   onLogSet,
   onMarkStrengthComplete,
+  stravaActivities,
 }: SessionModalProps) {
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
@@ -229,6 +231,44 @@ export function SessionModal({
                 </div>
               )}
             </div>
+
+            {/* Strava activity badge */}
+            {stravaActivities?.[day.date] && (() => {
+              const act = stravaActivities[day.date];
+              const totalSec = Math.round(act.avgPaceMinKm * 60);
+              const pace = `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 18,
+                    padding: '10px 14px',
+                    background: 'rgba(252,76,2,0.06)',
+                    border: '1px solid rgba(252,76,2,0.25)',
+                    borderRadius: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--mono)',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      color: '#FC4C02',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    via strava
+                  </span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-dim)' }}>
+                    {act.distanceKm} km&nbsp;&nbsp;·&nbsp;&nbsp;{pace} /km
+                    {act.avgHR != null && <>&nbsp;&nbsp;·&nbsp;&nbsp;{act.avgHR} bpm</>}
+                  </span>
+                </div>
+              );
+            })()}
 
             {/* Coach note */}
             {day.notes && (

@@ -78,3 +78,14 @@ export interface WorkoutLog {
   exercises: Record<string, SetLog[]>;
   completedAt?: string;
 }
+
+export interface StravaActivity {
+  id: string;
+  name: string;
+  date: string;         // YYYY-MM-DD (from start_date_local)
+  sportType: string;
+  distanceKm: number;
+  movingTimeSec: number;
+  avgPaceMinKm: number; // decimal minutes per km
+  avgHR?: number;
+}
