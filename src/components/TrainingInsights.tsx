@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { buildSummary } from '../lib/trainingMetrics';
 import type { StravaActivity } from '../types';
@@ -7,31 +7,62 @@ interface TrainingInsightsProps {
   stravaActivities: Record<string, StravaActivity>;
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
   const acts = useMemo(() => Object.values(stravaActivities), [stravaActivities]);
   const summary = useMemo(() => buildSummary(acts), [acts]);
-  const [analysis, setAnalysis] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function runAnalysis() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  async function send(history: ChatMessage[]) {
     setLoading(true);
-    setAnalysis('');
-    setError(null);
     try {
-      const r = await fetch('/api/analyze-training', {
+      const r = await fetch('/api/coach-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(summary),
+        body: JSON.stringify({ summary, messages: history }),
       });
-      const data = (await r.json()) as { analysis?: string; error?: string };
+      const data = (await r.json()) as { reply?: string; error?: string };
       if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
-      setAnalysis(data.analysis ?? 'No analysis returned.');
+      setMessages([...history, { role: 'assistant', content: data.reply ?? 'No reply.' }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Analysis failed');
+      setMessages([
+        ...history,
+        { role: 'assistant', content: e instanceof Error ? e.message : 'Something went wrong.' },
+      ]);
     } finally {
       setLoading(false);
     }
+  }
+
+  function start() {
+    const seed: ChatMessage[] = [
+      { role: 'user', content: 'Give me your honest read on where my training stands for sub-4 at Lisbon.' },
+    ];
+    setMessages(seed);
+    void send(seed);
+  }
+
+  function submit() {
+    const text = input.trim();
+    if (!text || loading) return;
+    const next = [...messages, { role: 'user' as const, content: text }];
+    setMessages(next);
+    setInput('');
+    void send(next);
   }
 
   const stats = [
@@ -183,76 +214,136 @@ export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
         </div>
       </div>
 
-      {/* Analyse button */}
-      <button
-        onClick={runAnalysis}
-        disabled={loading}
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 13,
-          fontWeight: 600,
-          letterSpacing: '0.06em',
-          textTransform: 'lowercase',
-          padding: '10px 20px',
-          borderRadius: 8,
-          border: 'none',
-          background: loading ? 'var(--bg-2)' : 'var(--accent)',
-          color: loading ? 'var(--text-muted)' : '#0B0D0F',
-          cursor: loading ? 'default' : 'pointer',
-          transition: 'background 150ms, color 150ms',
-        }}
-      >
-        {loading ? 'analysing…' : 'analyse my training'}
-      </button>
-
-      {/* Error */}
-      {error && (
-        <div
+      {/* Chat */}
+      {messages.length === 0 ? (
+        <button
+          onClick={start}
+          disabled={loading}
           style={{
-            marginTop: 14,
             fontFamily: 'var(--mono)',
-            fontSize: 12,
-            color: 'var(--danger)',
-            letterSpacing: '0.02em',
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'lowercase',
+            padding: '10px 20px',
+            borderRadius: 8,
+            border: 'none',
+            background: loading ? 'var(--bg-2)' : 'var(--accent)',
+            color: loading ? 'var(--text-muted)' : '#0B0D0F',
+            cursor: loading ? 'default' : 'pointer',
+            transition: 'background 150ms, color 150ms',
           }}
         >
-          {error}
-        </div>
-      )}
-
-      {/* Opus analysis */}
-      {analysis && (
-        <div
-          style={{
-            marginTop: 24,
-            background: 'var(--bg-2)',
-            border: '1px solid var(--border)',
-            borderRadius: 12,
-            padding: '24px 28px',
-          }}
-        >
+          {loading ? 'analysing…' : 'analyse my training'}
+        </button>
+      ) : (
+        <div>
+          {/* Transcript */}
           <div
+            ref={transcriptRef}
             style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 11.5,
-              letterSpacing: '0.08em',
-              color: 'var(--accent)',
-              textTransform: 'uppercase',
-              marginBottom: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              maxHeight: 480,
+              overflowY: 'auto',
+              paddingRight: 4,
             }}
           >
-            // coach · opus 4.8
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '85%',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'var(--mono)',
+                    fontSize: 11,
+                    letterSpacing: '0.06em',
+                    color: 'var(--text-muted)',
+                    marginBottom: 4,
+                    textTransform: 'lowercase',
+                  }}
+                >
+                  {m.role === 'user' ? 'you' : '// coach · opus 4.8'}
+                </div>
+                <div
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.75,
+                    fontSize: 15,
+                    fontFamily: 'var(--sans)',
+                    background: m.role === 'user' ? 'var(--bg-2)' : 'transparent',
+                    border: m.role === 'user' ? 'none' : '1px solid var(--border)',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    color: 'var(--text)',
+                  }}
+                >
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                coach is thinking…
+              </div>
+            )}
           </div>
-          <div
-            style={{
-              fontFamily: 'var(--sans)',
-              fontSize: 15,
-              lineHeight: 1.75,
-              color: 'var(--text)',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {analysis}
+
+          {/* Input */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="ask a follow-up — e.g. what should my long run be this week?"
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+                fontFamily: 'var(--mono)',
+                fontSize: 13,
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={submit}
+              disabled={loading || !input.trim()}
+              style={{
+                padding: '10px 18px',
+                borderRadius: 8,
+                background: input.trim() && !loading ? 'var(--accent)' : 'var(--bg-2)',
+                color: input.trim() && !loading ? '#0B0D0F' : 'var(--text-muted)',
+                border: 'none',
+                fontFamily: 'var(--mono)',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: input.trim() && !loading ? 'pointer' : 'default',
+                transition: 'background 150ms, color 150ms',
+              }}
+            >
+              send
+            </button>
           </div>
         </div>
       )}
