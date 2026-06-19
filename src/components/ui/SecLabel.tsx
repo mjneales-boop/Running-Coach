@@ -4,11 +4,13 @@ interface SecLabelProps {
   children: ReactNode;
   action?: ReactNode;
   style?: React.CSSProperties;
+  className?: string;
 }
 
-export function SecLabel({ children, action, style }: SecLabelProps) {
+export function SecLabel({ children, action, style, className }: SecLabelProps) {
   return (
     <div
+      className={className}
       style={{
         display: 'flex',
         alignItems: 'center',

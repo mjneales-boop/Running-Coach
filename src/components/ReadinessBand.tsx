@@ -98,6 +98,7 @@ function MetricBig({ label, value, unit, baseline, higherIsBetter, isFirst }: Me
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
         <span
+          className="metric-value"
           style={{
             fontFamily: 'var(--sans)',
             fontWeight: 900,
@@ -423,9 +424,10 @@ export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: Readi
         }}
       >
         {/* Hero zone */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 28 }}>
+        <div className="readiness-hero" style={{ display: 'flex', alignItems: 'flex-end', gap: 28 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 18 }}>
             <span
+              className="readiness-score"
               style={{
                 fontFamily: 'var(--sans)',
                 fontWeight: 900,
@@ -468,7 +470,7 @@ export function ReadinessBand({ latestEntry, latestSleepDate, onOpenLog }: Readi
           </div>
 
           {score != null && (
-            <div style={{ flex: 1, paddingBottom: 14 }}>
+            <div className="readiness-scale-wrap" style={{ flex: 1, paddingBottom: 14 }}>
               <ReadinessScaleBar score={score} />
             </div>
           )}

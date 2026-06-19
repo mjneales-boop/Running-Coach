@@ -9,6 +9,7 @@ import { SessionModal } from './components/SessionModal';
 import { ReadinessModal } from './components/ReadinessModal';
 import { StrengthView } from './components/StrengthView';
 import { TrainingInsights } from './components/TrainingInsights';
+import { MobileGymLog } from './components/MobileGymLog';
 import { useCurrentDate } from './hooks/useCurrentDate';
 import { useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
@@ -35,7 +36,7 @@ export default function App() {
     [],
   );
 
-  const [view, setView] = useState<'dashboard' | 'strength' | 'insights'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'strength' | 'insights' | 'gym'>('dashboard');
   const [viewedWeekIndex, setViewedWeekIndex] = useState(initialWeekIndex);
   const [sessionModal, setSessionModal] = useState<SessionModalTarget | null>(null);
   const [readinessModalOpen, setReadinessModalOpen] = useState(false);
@@ -89,6 +90,7 @@ export default function App() {
       }}
     >
       <div
+        className="app-container"
         style={{
           maxWidth: 1200,
           margin: '0 auto',
@@ -101,7 +103,7 @@ export default function App() {
 
         {/* View nav */}
         <div style={{ display: 'flex', gap: 24, marginBottom: SEC_GAP, fontFamily: 'var(--mono)', fontSize: 13 }}>
-          {(['dashboard', 'strength', 'insights'] as const).map((v) => (
+          {(['dashboard', 'strength', 'insights', 'gym'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -187,6 +189,23 @@ export default function App() {
 
         {/* Insights view */}
         {view === 'insights' && <TrainingInsights stravaActivities={stravaActivities} />}
+
+        {/* Gym quick-log view */}
+        {view === 'gym' && todaySession ? (
+          <MobileGymLog
+            day={todaySession}
+            weekId={currentWeek.id}
+            strength={strength}
+            onLogSet={logSet}
+            onMarkComplete={markStrengthComplete}
+            onToggleDone={toggleDone}
+            completion={completion}
+          />
+        ) : view === 'gym' ? (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-muted)' }}>
+            no gym session today
+          </div>
+        ) : null}
       </div>
 
       {/* Session modal */}

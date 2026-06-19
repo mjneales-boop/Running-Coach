@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
     <title>Marathon Coach · Lisbon 2026</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,6 +15,33 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+  <style>
+    html { -webkit-text-size-adjust: 100%; }
+    body { overscroll-behavior-y: contain; }
+    .app-shell { min-height: 100vh; min-height: 100dvh; }
+    .safe-top    { padding-top:    env(safe-area-inset-top);    }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    input, select, textarea { font-size: 16px; }
+    @media (max-width: 768px) {
+      .desktop-grid { grid-template-columns: 1fr !important; }
+      .stat-card    { min-width: 0 !important; }
+    }
+
+    /* Responsive font sizes — clamp() keeps desktop identical */
+    .header-date      { font-size: clamp(18px, 6vw, 30px)   !important; }
+    .header-countdown { font-size: clamp(30px, 10vw, 48px)  !important; }
+    .readiness-score  { font-size: clamp(60px, 20vw, 120px) !important; }
+    .metric-value     { font-size: clamp(22px, 8vw, 38px)   !important; }
+
+    @media (max-width: 768px) {
+      .app-container    { padding-left: 16px !important; padding-right: 16px !important; }
+      .dashboard-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+      .readiness-hero   { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+      .readiness-scale-wrap { width: 100% !important; padding-bottom: 0 !important; }
+      .week-header      { flex-wrap: wrap !important; white-space: normal !important; row-gap: 10px !important; }
+      #root             { max-width: 100vw; overflow-x: hidden; }
+    }
+  </style>
   </head>
   <body>
     <div id="root"></div>

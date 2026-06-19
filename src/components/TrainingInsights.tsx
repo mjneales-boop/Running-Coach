@@ -16,6 +16,7 @@ export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
   const acts = useMemo(() => Object.values(stravaActivities), [stravaActivities]);
   const summary = useMemo(() => buildSummary(acts), [acts]);
 
+  const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,14 +47,6 @@ export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
     } finally {
       setLoading(false);
     }
-  }
-
-  function start() {
-    const seed: ChatMessage[] = [
-      { role: 'user', content: 'Give me your honest read on where my training stands for sub-4 at Lisbon.' },
-    ];
-    setMessages(seed);
-    void send(seed);
   }
 
   function submit() {
@@ -215,10 +208,9 @@ export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
       </div>
 
       {/* Chat */}
-      {messages.length === 0 ? (
+      {!chatOpen ? (
         <button
-          onClick={start}
-          disabled={loading}
+          onClick={() => setChatOpen(true)}
           style={{
             fontFamily: 'var(--mono)',
             fontSize: 13,
@@ -228,13 +220,13 @@ export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
             padding: '10px 20px',
             borderRadius: 8,
             border: 'none',
-            background: loading ? 'var(--bg-2)' : 'var(--accent)',
-            color: loading ? 'var(--text-muted)' : '#0B0D0F',
-            cursor: loading ? 'default' : 'pointer',
+            background: 'var(--accent)',
+            color: '#0B0D0F',
+            cursor: 'pointer',
             transition: 'background 150ms, color 150ms',
           }}
         >
-          {loading ? 'analysing…' : 'analyse my training'}
+          chat with coach
         </button>
       ) : (
         <div>
@@ -312,7 +304,7 @@ export function TrainingInsights({ stravaActivities }: TrainingInsightsProps) {
                   submit();
                 }
               }}
-              placeholder="ask a follow-up — e.g. what should my long run be this week?"
+              placeholder="ask your coach anything — e.g. where does my training stand?"
               disabled={loading}
               style={{
                 flex: 1,

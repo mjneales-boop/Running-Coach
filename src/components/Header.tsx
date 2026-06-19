@@ -12,6 +12,7 @@ export function Header({ today, daysToRace }: HeaderProps) {
 
   return (
     <header
+      className="dashboard-header"
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -34,6 +35,7 @@ export function Header({ today, daysToRace }: HeaderProps) {
           {'// ' + raceLabel}
         </div>
         <div
+          className="header-date"
           style={{
             fontFamily: 'var(--sans)',
             fontWeight: 900,
@@ -69,6 +71,7 @@ export function Header({ today, daysToRace }: HeaderProps) {
           }}
         >
           <span
+            className="header-countdown"
             style={{
               fontFamily: 'var(--sans)',
               fontWeight: 900,

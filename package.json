@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
+    "@upstash/redis": "^1.38.0",
     "iron-session": "^8.0.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

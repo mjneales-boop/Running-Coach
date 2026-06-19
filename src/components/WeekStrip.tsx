@@ -73,7 +73,7 @@ export function WeekStrip({
 
   return (
     <>
-      <SecLabel action={navButtons}>
+      <SecLabel className="week-header" action={navButtons}>
         {`this week · ${week.label} · target ${week.targetKm}km · done ${doneKm}km`}
       </SecLabel>
 
