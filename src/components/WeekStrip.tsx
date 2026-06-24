@@ -77,7 +77,9 @@ export function WeekStrip({
         {`this week · ${week.label} · target ${week.targetKm}km · done ${doneKm}km`}
       </SecLabel>
 
+      <div className="week-strip-scroll">
       <div
+        className="week-strip-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
@@ -179,6 +181,7 @@ export function WeekStrip({
             </div>
           );
         })}
+      </div>
       </div>
     </>
   );
