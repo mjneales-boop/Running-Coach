@@ -1,5 +1,5 @@
 import { ATHLETE, PHASES } from '../constants/plan';
-import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap } from '../types';
+import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, GymOverrides } from '../types';
 
 function localDateStr(date: Date): string {
   const y = date.getFullYear();
@@ -97,6 +97,17 @@ export function applySwapsToWeek(week: Week, contentMap: WeekContentMap): Week {
     const srcDay = byAbbr.get(src);
     if (!srcDay) return pos;
     return { ...srcDay, d: pos.d, date: pos.date };
+  });
+  return { ...week, days };
+}
+
+export function applyGymOverrides(week: Week, overrides: GymOverrides): Week {
+  if (!overrides || Object.keys(overrides).length === 0) return week;
+  const days = week.days.map((day) => {
+    const o = overrides[day.date];
+    if (!o) return day;
+    if (o.gym === null) return { ...day, gym: undefined, workoutId: undefined };
+    return { ...day, gym: o.gym, workoutId: o.workoutId ?? undefined };
   });
   return { ...week, days };
 }

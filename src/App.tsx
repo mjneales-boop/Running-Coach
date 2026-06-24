@@ -16,8 +16,9 @@ import { useReadiness } from './hooks/useReadiness';
 import { useSwaps } from './hooks/useSwaps';
 import { useStrength } from './hooks/useStrength';
 import { useStorage } from './hooks/useStorage';
+import { useGymSchedule } from './hooks/useGymSchedule';
 import { usePlan, WEEKS } from './hooks/usePlan';
-import { findCurrentWeekIndex, findTodaySession, applySwapsToWeek } from './lib/logic';
+import { findCurrentWeekIndex, findTodaySession, applySwapsToWeek, applyGymOverrides } from './lib/logic';
 import type { DayAbbr, StravaActivity } from './types';
 
 interface SessionModalTarget {
@@ -47,16 +48,17 @@ export default function App() {
   const { completion, toggleDone, setNotes } = useCompletion();
   const { latestEntry, latestSleepDate, logEntry } = useReadiness();
   const { swaps, swapDays } = useSwaps();
+  const { gymOverrides, setGymOnDay, removeGymFromDay, moveGym } = useGymSchedule();
   const { strength, logSet, markComplete: markStrengthComplete } = useStrength();
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
 
   const swappedCurrentWeek = useMemo(
-    () => applySwapsToWeek(currentWeek, swaps[currentWeek.id] ?? {}),
-    [currentWeek, swaps],
+    () => applyGymOverrides(applySwapsToWeek(currentWeek, swaps[currentWeek.id] ?? {}), gymOverrides),
+    [currentWeek, swaps, gymOverrides],
   );
   const swappedViewedWeek = useMemo(
-    () => applySwapsToWeek(viewedWeek, swaps[viewedWeek.id] ?? {}),
-    [viewedWeek, swaps],
+    () => applyGymOverrides(applySwapsToWeek(viewedWeek, swaps[viewedWeek.id] ?? {}), gymOverrides),
+    [viewedWeek, swaps, gymOverrides],
   );
   const todaySession = useMemo(
     () => findTodaySession(today, swappedCurrentWeek),
@@ -167,6 +169,9 @@ export default function App() {
               onPrev={handlePrevWeek}
               onToday={handleTodayWeek}
               onNext={handleNextWeek}
+              onMoveGym={moveGym}
+              onAddGym={setGymOnDay}
+              onRemoveGym={removeGymFromDay}
             />
             <div style={{ height: SEC_GAP }} />
 
@@ -211,7 +216,7 @@ export default function App() {
       {/* Session modal */}
       {sessionModal && (() => {
         const rawWeek = WEEKS.find((w) => w.id === sessionModal.weekId)!;
-        const modalWeek = applySwapsToWeek(rawWeek, swaps[sessionModal.weekId] ?? {});
+        const modalWeek = applyGymOverrides(applySwapsToWeek(rawWeek, swaps[sessionModal.weekId] ?? {}), gymOverrides);
         return (
           <SessionModal
             weekId={sessionModal.weekId}
@@ -227,6 +232,8 @@ export default function App() {
             onLogSet={logSet}
             onMarkStrengthComplete={markStrengthComplete}
             stravaActivities={stravaActivities}
+            onAddGym={setGymOnDay}
+            onRemoveGym={removeGymFromDay}
           />
         );
       })()}

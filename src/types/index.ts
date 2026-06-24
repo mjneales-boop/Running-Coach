@@ -66,6 +66,9 @@ export type ReadinessTier = 'excellent' | 'good' | 'yellow' | 'compromised' | 'r
 export type WeekContentMap = Partial<Record<DayAbbr, DayAbbr>>;
 export type SwapStore = Record<string, WeekContentMap>;
 
+export type GymOverrideEntry = { gym: string | null; workoutId: string | null };
+export type GymOverrides = Record<string, GymOverrideEntry>;
+
 export interface SetLog {
   weight?: number;
   reps?: number;

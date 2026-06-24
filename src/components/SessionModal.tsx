@@ -3,7 +3,10 @@ import { Pill } from './ui/Pill';
 import { GymLogger } from './GymLogger';
 import { isHardSession } from '../lib/logic';
 import { guideEntriesForDay } from '../lib/coaching';
+import { WORKOUTS } from '../constants/workouts';
 import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog, StravaActivity } from '../types';
+
+const GYM_OPTIONS = Object.values(WORKOUTS).map((w) => ({ id: w.id, name: w.name }));
 
 interface SessionModalProps {
   weekId: string;
@@ -19,6 +22,8 @@ interface SessionModalProps {
   onLogSet: (date: string, workoutId: string, exerciseId: string, setIndex: number, setLog: SetLog) => Promise<void>;
   onMarkStrengthComplete: (date: string, workoutId: string) => Promise<void>;
   stravaActivities?: Record<string, StravaActivity>;
+  onAddGym: (date: string, gym: string, workoutId: string) => void;
+  onRemoveGym: (date: string) => void;
 }
 
 export function SessionModal({
@@ -35,6 +40,8 @@ export function SessionModal({
   onLogSet,
   onMarkStrengthComplete,
   stravaActivities,
+  onAddGym,
+  onRemoveGym,
 }: SessionModalProps) {
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
@@ -46,6 +53,7 @@ export function SessionModal({
   const showTabs = hasCardio && hasGym;
   const runLabel = day?.type === 'BIKE' ? 'bike' : 'run';
   const [activeTab, setActiveTab] = useState<'run' | 'gym'>('run');
+  const [showAddGymPicker, setShowAddGymPicker] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -402,6 +410,99 @@ export function SessionModal({
               </div>
             </div>
 
+            {/* Gym session management */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                  // gym
+                </span>
+                {hasGym ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--accent)' }}>{day.gym}</span>
+                    <button
+                      onClick={() => onRemoveGym(day.date)}
+                      style={{
+                        fontFamily: 'var(--mono)',
+                        fontSize: 11,
+                        padding: '4px 10px',
+                        borderRadius: 5,
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-3)',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        letterSpacing: '0.03em',
+                      }}
+                    >
+                      remove
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowAddGymPicker((v) => !v)}
+                      style={{
+                        fontFamily: 'var(--mono)',
+                        fontSize: 11,
+                        padding: '4px 10px',
+                        borderRadius: 5,
+                        border: '1px dashed var(--border)',
+                        background: 'var(--bg-3)',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        letterSpacing: '0.03em',
+                        transition: 'border-color 150ms, color 150ms',
+                      }}
+                    >
+                      + add gym session
+                    </button>
+                    {showAddGymPicker && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 6px)',
+                          right: 0,
+                          zIndex: 10,
+                          background: 'var(--bg-2)',
+                          border: '1px solid var(--border-hover)',
+                          borderRadius: 8,
+                          padding: '6px 0',
+                          minWidth: 160,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                        }}
+                      >
+                        {GYM_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.id}
+                            onClick={() => {
+                              onAddGym(day.date, opt.name, opt.id);
+                              setShowAddGymPicker(false);
+                            }}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              textAlign: 'left',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontFamily: 'var(--mono)',
+                              fontSize: 12,
+                              color: 'var(--text-dim)',
+                              padding: '8px 14px',
+                            }}
+                            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-3)')}
+                            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = 'transparent')}
+                          >
+                            {opt.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* If done, show completedAt */}
             {entry.done && entry.completedAt && (
               <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--success)', marginBottom: 16 }}>
@@ -435,15 +536,35 @@ export function SessionModal({
 
         {/* Gym tab content */}
         {showTabs && activeTab === 'gym' && (
-          <GymLogger
-            day={day}
-            weekId={weekId}
-            strength={strength}
-            onLogSet={onLogSet}
-            onMarkComplete={onMarkStrengthComplete}
-            onToggleDone={onToggleDone}
-            completion={completion}
-          />
+          <>
+            <GymLogger
+              day={day}
+              weekId={weekId}
+              strength={strength}
+              onLogSet={onLogSet}
+              onMarkComplete={onMarkStrengthComplete}
+              onToggleDone={onToggleDone}
+              completion={completion}
+            />
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <button
+                onClick={() => { onRemoveGym(day.date); onClose(); }}
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 12,
+                  padding: '8px 14px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                remove gym from this day
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
