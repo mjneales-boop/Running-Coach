@@ -27,20 +27,26 @@ export function StrengthView({ strength }: StrengthViewProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<string>('chestback');
   const [selectedExercise, setSelectedExercise] = useState<string>(() => {
     const template = WORKOUTS['chestback'];
-    return template.blocks.flatMap((b) => b.exercises).find((e) => e.tracked)?.id ?? '';
+    return [...template.blocks.flatMap((b) => b.exercises), ...template.alternatives].find((e) => e.tracked)?.id ?? '';
   });
   const [metric, setMetric] = useState<'topSet' | 'est1RM'>('topSet');
 
   const trackedExercises = useMemo(() => {
     const template = WORKOUTS[selectedWorkout];
     if (!template) return [];
-    return template.blocks.flatMap((b) => b.exercises).filter((e) => e.tracked);
+    return [
+      ...template.blocks.flatMap((b) => b.exercises),
+      ...template.alternatives,
+    ].filter((e) => e.tracked);
   }, [selectedWorkout]);
 
   const handleWorkoutChange = (workoutId: string) => {
     setSelectedWorkout(workoutId);
     const template = WORKOUTS[workoutId];
-    const first = template?.blocks.flatMap((b) => b.exercises).find((e) => e.tracked);
+    const first = [
+      ...template.blocks.flatMap((b) => b.exercises),
+      ...template.alternatives,
+    ].find((e) => e.tracked);
     setSelectedExercise(first?.id ?? '');
   };
 

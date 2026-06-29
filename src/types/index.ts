@@ -82,6 +82,12 @@ export interface WorkoutLog {
   completedAt?: string;
 }
 
+export interface SessionExerciseConfig {
+  workoutId: string;
+  exerciseIds: string[];
+}
+export type SessionExerciseOverrides = Record<string, SessionExerciseConfig>;
+
 export interface StravaActivity {
   id: string;
   name: string;

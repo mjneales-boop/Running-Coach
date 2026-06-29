@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { WORKOUTS } from '../constants/workouts';
 import { lastWorkoutLog } from '../lib/strength';
-import type { Day, DayAbbr, CompletionEntry, SetLog, WorkoutLog } from '../types';
+import { getSessionExercises, getAllExercises } from '../lib/exercises';
+import type { Day, DayAbbr, CompletionEntry, SetLog, WorkoutLog, SessionExerciseOverrides } from '../types';
+import type { Exercise } from '../constants/workouts';
 
 interface MobileGymLogProps {
   day: Day;
@@ -11,6 +13,8 @@ interface MobileGymLogProps {
   onMarkComplete: (date: string, workoutId: string) => Promise<void>;
   onToggleDone: (weekId: string, day: DayAbbr) => Promise<void>;
   completion: Record<string, CompletionEntry>;
+  exerciseOverrides: SessionExerciseOverrides;
+  onSetSessionExercises: (date: string, workoutId: string, exerciseIds: string[]) => void;
 }
 
 function Stepper({
@@ -112,6 +116,8 @@ export function MobileGymLog({
   onMarkComplete,
   onToggleDone,
   completion,
+  exerciseOverrides,
+  onSetSessionExercises,
 }: MobileGymLogProps) {
   const template = WORKOUTS[day.workoutId ?? ''];
 
@@ -123,7 +129,12 @@ export function MobileGymLog({
     );
   }
 
-  const allExercises = template.blocks.flatMap((b) => b.exercises);
+  const overrideIds = exerciseOverrides[day.date]?.workoutId === day.workoutId
+    ? exerciseOverrides[day.date].exerciseIds
+    : null;
+  const allExercises = getSessionExercises(day.workoutId!, overrideIds);
+  const allExercisesById = getAllExercises(day.workoutId!);
+
   const lastLog = lastWorkoutLog(strength, day.workoutId!, day.date);
   const currentLog = strength[day.date];
   const sessionKey = `${weekId}-${day.d}`;
@@ -134,6 +145,10 @@ export function MobileGymLog({
   const [kg, setKg] = useState<number>(() => lastLog?.exercises[allExercises[0]?.id]?.[0]?.weight ?? 0);
   const [reps, setReps] = useState<number>(() => lastLog?.exercises[allExercises[0]?.id]?.[0]?.reps ?? 0);
   const [logging, setLogging] = useState(false);
+
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false);
+  const [draftOrder, setDraftOrder] = useState<Exercise[]>([]);
 
   const exercise = allExercises[exIdx];
   const totalSets = exercise?.sets ?? 1;
@@ -179,6 +194,32 @@ export function MobileGymLog({
     }
   }, [exercise, logging, kg, reps, setIdx, isLastSet, isLastExercise, exIdx, day, weekId, onLogSet, onMarkComplete, onToggleDone, advanceTo]);
 
+  const enterEditMode = () => {
+    setDraftOrder([...allExercises]);
+    setEditMode(true);
+  };
+
+  const saveEditMode = () => {
+    onSetSessionExercises(day.date, day.workoutId!, draftOrder.map((e) => e.id));
+    setEditMode(false);
+  };
+
+  const moveExercise = (idx: number, dir: -1 | 1) => {
+    const next = [...draftOrder];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setDraftOrder(next);
+  };
+
+  const swapExercise = (idx: number, newId: string) => {
+    const newEx = allExercisesById[newId];
+    if (!newEx) return;
+    const next = [...draftOrder];
+    next[idx] = newEx;
+    setDraftOrder(next);
+  };
+
   if (isDone) {
     return (
       <div
@@ -207,6 +248,174 @@ export function MobileGymLog({
     );
   }
 
+  // Edit mode
+  if (editMode) {
+    const draftIds = new Set(draftOrder.map((e) => e.id));
+
+    return (
+      <div
+        className="app-shell safe-top"
+        style={{
+          maxWidth: 480,
+          margin: '0 auto',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100dvh',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+            // edit session
+          </div>
+          <button
+            onClick={() => setEditMode(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--mono)',
+              fontSize: 12,
+              cursor: 'pointer',
+              padding: '4px 8px',
+            }}
+          >
+            cancel
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {draftOrder.map((ex, idx) => {
+            const isLocked = !!ex.locked;
+            const swappablePool = [
+              ...template.alternatives,
+              ...template.blocks.flatMap((b) => b.exercises),
+            ].filter((a, i, arr) =>
+              a.id !== ex.id &&
+              !draftIds.has(a.id) &&
+              arr.findIndex((x) => x.id === a.id) === i
+            );
+
+            return (
+              <div
+                key={ex.id}
+                style={{
+                  marginBottom: 10,
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-2)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* Up/Down */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <button
+                      onClick={() => moveExercise(idx, -1)}
+                      disabled={idx === 0}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-3)',
+                        color: 'var(--text)',
+                        fontSize: 16,
+                        cursor: idx === 0 ? 'default' : 'pointer',
+                        opacity: idx === 0 ? 0.3 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => moveExercise(idx, 1)}
+                      disabled={idx === draftOrder.length - 1}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-3)',
+                        color: 'var(--text)',
+                        fontSize: 16,
+                        cursor: idx === draftOrder.length - 1 ? 'default' : 'pointer',
+                        opacity: idx === draftOrder.length - 1 ? 0.3 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      ↓
+                    </button>
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>
+                      {ex.name}
+                    </div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>
+                      {ex.sets}×{ex.reps}
+                    </div>
+                  </div>
+
+                  {/* Lock or swap select */}
+                  {isLocked ? (
+                    <span style={{ fontSize: 18 }} title="Mandatory — cannot be swapped">🔒</span>
+                  ) : (
+                    <select
+                      value=""
+                      onChange={(e) => { if (e.target.value) swapExercise(idx, e.target.value); }}
+                      style={{
+                        fontFamily: 'var(--mono)',
+                        fontSize: 12,
+                        background: 'var(--bg-3)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 6,
+                        color: 'var(--text-muted)',
+                        padding: '4px 6px',
+                        cursor: 'pointer',
+                        maxWidth: 90,
+                      }}
+                    >
+                      <option value="">swap…</option>
+                      {swappablePool.map((alt) => (
+                        <option key={alt.id} value={alt.id}>{alt.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="safe-bottom" style={{ paddingTop: 16 }}>
+          <button
+            onClick={saveEditMode}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              borderRadius: 12,
+              background: '#00D9FF',
+              color: '#0B0D0F',
+              border: 'none',
+              fontFamily: 'var(--sans)',
+              fontWeight: 700,
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
+          >
+            Save &amp; start workout
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!exercise) return null;
 
   const blockName = template.blocks.find((b) => b.exercises.some((e) => e.id === exercise.id))?.name ?? '';
@@ -226,16 +435,33 @@ export function MobileGymLog({
     >
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
-            color: 'var(--text-muted)',
-            letterSpacing: '0.06em',
-            marginBottom: 4,
-          }}
-        >
-          // {template.name.toLowerCase()} · {blockName.toLowerCase()}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              letterSpacing: '0.06em',
+            }}
+          >
+            // {template.name.toLowerCase()}{overrideIds ? ' · custom' : ''}{blockName ? ` · ${blockName.toLowerCase()}` : ''}
+          </div>
+          <button
+            onClick={enterEditMode}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+              cursor: 'pointer',
+              padding: '3px 8px',
+              letterSpacing: '0.03em',
+            }}
+          >
+            edit
+          </button>
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>
           exercise {exIdx + 1} of {allExercises.length} · set {setIdx + 1} of {totalSets}

@@ -17,6 +17,7 @@ import { useSwaps } from './hooks/useSwaps';
 import { useStrength } from './hooks/useStrength';
 import { useStorage } from './hooks/useStorage';
 import { useGymSchedule } from './hooks/useGymSchedule';
+import { useExerciseOverrides } from './hooks/useExerciseOverrides';
 import { usePlan, WEEKS } from './hooks/usePlan';
 import { findCurrentWeekIndex, findTodaySession, applySwapsToWeek, applyGymOverrides } from './lib/logic';
 import type { DayAbbr, StravaActivity } from './types';
@@ -49,6 +50,7 @@ export default function App() {
   const { latestEntry, latestSleepDate, logEntry } = useReadiness();
   const { swaps, swapDays } = useSwaps();
   const { gymOverrides, setGymOnDay, removeGymFromDay, moveGym } = useGymSchedule();
+  const { exerciseOverrides, setSessionExercises } = useExerciseOverrides();
   const { strength, logSet, markComplete: markStrengthComplete } = useStrength();
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
 
@@ -205,6 +207,8 @@ export default function App() {
             onMarkComplete={markStrengthComplete}
             onToggleDone={toggleDone}
             completion={completion}
+            exerciseOverrides={exerciseOverrides}
+            onSetSessionExercises={setSessionExercises}
           />
         ) : view === 'gym' ? (
           <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-muted)' }}>
@@ -234,6 +238,8 @@ export default function App() {
             stravaActivities={stravaActivities}
             onAddGym={setGymOnDay}
             onRemoveGym={removeGymFromDay}
+            exerciseOverrides={exerciseOverrides}
+            onSetSessionExercises={setSessionExercises}
           />
         );
       })()}

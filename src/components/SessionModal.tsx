@@ -4,7 +4,7 @@ import { GymLogger } from './GymLogger';
 import { isHardSession } from '../lib/logic';
 import { guideEntriesForDay } from '../lib/coaching';
 import { WORKOUTS } from '../constants/workouts';
-import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog, StravaActivity } from '../types';
+import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog, StravaActivity, SessionExerciseOverrides } from '../types';
 
 const GYM_OPTIONS = Object.values(WORKOUTS).map((w) => ({ id: w.id, name: w.name }));
 
@@ -24,6 +24,8 @@ interface SessionModalProps {
   stravaActivities?: Record<string, StravaActivity>;
   onAddGym: (date: string, gym: string, workoutId: string) => void;
   onRemoveGym: (date: string) => void;
+  exerciseOverrides: SessionExerciseOverrides;
+  onSetSessionExercises: (date: string, workoutId: string, exerciseIds: string[]) => void;
 }
 
 export function SessionModal({
@@ -42,6 +44,8 @@ export function SessionModal({
   stravaActivities,
   onAddGym,
   onRemoveGym,
+  exerciseOverrides,
+  onSetSessionExercises,
 }: SessionModalProps) {
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
@@ -545,6 +549,8 @@ export function SessionModal({
               onMarkComplete={onMarkStrengthComplete}
               onToggleDone={onToggleDone}
               completion={completion}
+              exerciseOverrides={exerciseOverrides}
+              onSetSessionExercises={onSetSessionExercises}
             />
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
               <button
