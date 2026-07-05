@@ -12,7 +12,7 @@ export function WeekProgressCard({ kmDone, kmTarget, nextDayLabel, nextTitle, ne
   return (
     <div className="stride-rise mb-[26px] rounded-[18px] border border-hairline bg-surface p-[22px]">
       <div className="mb-3.5 flex items-baseline gap-2">
-        <span className="text-[34px] font-extrabold tracking-[-0.02em]">{kmDone}</span>
+        <span className="text-[34px] font-extrabold tracking-[-0.02em]">{Number(kmDone.toFixed(2))}</span>
         <span className="font-mono text-sm tracking-[0.05em] text-muted">/ {kmTarget} km done</span>
       </div>
       <div className="h-2 overflow-hidden rounded-md bg-surface-2">

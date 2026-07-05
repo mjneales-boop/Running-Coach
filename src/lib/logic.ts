@@ -84,12 +84,13 @@ export function weekCompletionPct(week: Week, completion: Record<string, Complet
 }
 
 export function weeklyKmDone(week: Week, completion: Record<string, CompletionEntry>): number {
-  return week.days.reduce((sum, d) => {
+  const total = week.days.reduce((sum, d) => {
     const entry = completion[`${week.id}-${d.d}`];
     if (!entry?.done) return sum;
     const km = entry.actualKm ?? d.km ?? 0;
     return sum + km;
   }, 0);
+  return Math.round(total * 100) / 100;
 }
 
 export function currentPhase(week: Week): PhaseInfo {
@@ -144,9 +145,18 @@ export function applyGymOverrides(week: Week, overrides: GymOverrides): Week {
   return { ...week, days };
 }
 
-export function nextNonRestDay(today: Date, week: Week): Day | undefined {
+export function nextNonRestDay(today: Date, week: Week, allWeeks?: Week[]): Day | undefined {
   const t = localDateStr(today);
-  return week.days.find((d) => d.date > t && d.type !== 'REST');
+  const inWeek = week.days.find((d) => d.date > t && d.type !== 'REST');
+  if (inWeek) return inWeek;
+  if (!allWeeks) return undefined;
+  // Nothing left this week (e.g. Sat/Sun with only rest ahead) — look into following weeks.
+  const idx = allWeeks.findIndex((w) => w.id === week.id);
+  for (let i = idx + 1; i < allWeeks.length; i++) {
+    const found = allWeeks[i].days.find((d) => d.date > t && d.type !== 'REST');
+    if (found) return found;
+  }
+  return undefined;
 }
 
 export function zoneForPace(paceStr: string | undefined): Zone | undefined {
