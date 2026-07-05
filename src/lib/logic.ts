@@ -1,5 +1,5 @@
-import { ATHLETE, PHASES } from '../constants/plan';
-import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, GymOverrides } from '../types';
+import { ATHLETE, PHASES, ZONES, GOAL_PACE, PEAK_KM } from '../constants/plan';
+import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, GymOverrides, Zone, StravaActivity } from '../types';
 
 function localDateStr(date: Date): string {
   const y = date.getFullYear();
@@ -60,6 +60,14 @@ export function readinessStatus(score: number | null | undefined): string {
   return 'RED';
 }
 
+export function readinessHeadline(score: number | null | undefined): { headline: string; sub: string } {
+  if (score == null) return { headline: '—', sub: 'No data yet' };
+  if (score >= 80) return { headline: 'Primed', sub: 'Above baseline' };
+  if (score >= 65) return { headline: 'Steady', sub: 'On track' };
+  if (score >= 50) return { headline: 'Compromised', sub: 'Below baseline' };
+  return { headline: 'Recovering', sub: 'Prioritize rest' };
+}
+
 export function readinessAdjustment(score: number | null | undefined): string {
   if (score == null) return '';
   if (score >= 85) return 'Execute as planned. Top of pace ranges OK.';
@@ -88,6 +96,30 @@ export function currentPhase(week: Week): PhaseInfo {
   return PHASES.find((p) => p.num === week.phase)!;
 }
 
+export function groupWeeksByPhase(weeks: Week[]): { phase: PhaseInfo; weeks: Week[] }[] {
+  const groups: { phase: PhaseInfo; weeks: Week[] }[] = [];
+  for (const w of weeks) {
+    const last = groups[groups.length - 1];
+    if (last && last.phase.num === w.phase) {
+      last.weeks.push(w);
+    } else {
+      groups.push({ phase: currentPhase(w), weeks: [w] });
+    }
+  }
+  return groups;
+}
+
+/** The week's defining session (race day, then long run, then quality workout) for a one-line summary. */
+export function weekFocus(week: Week): string {
+  const race = week.days.find((d) => d.type === 'RACE');
+  if (race) return race.title;
+  const long = week.days.find((d) => d.type === 'LONG');
+  if (long) return long.title;
+  const workout = week.days.find((d) => d.type === 'WORKOUT');
+  if (workout) return workout.title;
+  return week.label;
+}
+
 export function applySwapsToWeek(week: Week, contentMap: WeekContentMap): Week {
   if (!contentMap || Object.keys(contentMap).length === 0) return week;
   const byAbbr = new Map(week.days.map((d) => [d.d, d]));
@@ -110,6 +142,54 @@ export function applyGymOverrides(week: Week, overrides: GymOverrides): Week {
     return { ...day, gym: o.gym, workoutId: o.workoutId ?? undefined };
   });
   return { ...week, days };
+}
+
+export function nextNonRestDay(today: Date, week: Week): Day | undefined {
+  const t = localDateStr(today);
+  return week.days.find((d) => d.date > t && d.type !== 'REST');
+}
+
+export function zoneForPace(paceStr: string | undefined): Zone | undefined {
+  if (!paceStr) return undefined;
+  const exact = ZONES.find((z) => z.pace === paceStr);
+  if (exact) return exact;
+  const lower = paceStr.toLowerCase();
+  return ZONES.find((z) => lower.includes(z.name.toLowerCase().split(' ')[0]));
+}
+
+function paceToMinutes(pace: string): number | undefined {
+  const cleaned = pace.replace(/\s/g, '');
+  if (/[a-z]/i.test(cleaned)) return undefined; // e.g. "easy→5:41" — mixed-effort, too ambiguous to average
+  const parts = cleaned.split(/[–\-→>]+/).filter(Boolean);
+  const nums = parts
+    .map((p) => {
+      const [m, s] = p.split(':').map(Number);
+      if (Number.isNaN(m)) return undefined;
+      return m + (s ?? 0) / 60;
+    })
+    .filter((n): n is number => n != null);
+  if (!nums.length) return undefined;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+export function estimateDuration(day: Day): string | undefined {
+  if (day.duration) {
+    const h = Math.floor(day.duration / 60);
+    const m = day.duration % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}m`;
+  }
+  if (!day.km || !day.pace) return undefined;
+  const paceMin = paceToMinutes(day.pace);
+  if (paceMin == null) return undefined;
+  const totalMin = day.km * paceMin;
+  const h = Math.floor(totalMin / 60);
+  const m = Math.round(totalMin % 60);
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+export function nextGymDay(today: Date, week: Week): Day | undefined {
+  const t = localDateStr(today);
+  return week.days.find((d) => d.date >= t && d.gym);
 }
 
 export function isHardSession(type: string): boolean {
@@ -177,4 +257,79 @@ export function readinessSecondaryWarnings(
   }
 
   return warnings;
+}
+
+export interface WeekVolumePoint {
+  weekId: string;
+  label: string;
+  km: number;
+  isPlanned: boolean;
+  isCurrent: boolean;
+}
+
+export interface ProgressStats {
+  fourWeekAvgKm: number;
+  peakWeekKm: number;
+  rampPct: number;
+  volume: WeekVolumePoint[];
+}
+
+export function buildProgressStats(
+  weeks: Week[],
+  completion: Record<string, CompletionEntry>,
+  currentWeekIndex: number,
+): ProgressStats {
+  const volume: WeekVolumePoint[] = weeks.map((w, i) => {
+    const isPlanned = i > currentWeekIndex;
+    const km = isPlanned ? w.targetKm : weeklyKmDone(w, completion);
+    return { weekId: w.id, label: w.num, km, isPlanned, isCurrent: i === currentWeekIndex };
+  });
+
+  const windowStart = Math.max(0, currentWeekIndex - 3);
+  const window = volume.slice(windowStart, currentWeekIndex + 1);
+  const fourWeekAvgKm = window.length
+    ? Math.round((window.reduce((s, w) => s + w.km, 0) / window.length) * 10) / 10
+    : 0;
+
+  const prevKm = volume[currentWeekIndex - 1]?.km ?? 0;
+  const curKm = volume[currentWeekIndex]?.km ?? 0;
+  const rampPct = prevKm > 0 ? Math.round(((curKm - prevKm) / prevKm) * 100) : 0;
+
+  return { fourWeekAvgKm, peakWeekKm: PEAK_KM, rampPct, volume };
+}
+
+function parsePaceToMinutes(pace: string): number {
+  const [m, s] = pace.split(':').map(Number);
+  return m + s / 60;
+}
+
+export interface PacePoint {
+  weekId: string;
+  label: string;
+  actual?: number;
+  planned: number;
+}
+
+export function buildPaceProgression(weeks: Week[], activities: StravaActivity[]): PacePoint[] {
+  const easyZone = ZONES.find((z) => z.name === 'Easy')!;
+  const [easyLo, easyHi] = easyZone.pace.split('–').map(parsePaceToMinutes);
+  const easyMid = (easyLo + easyHi) / 2;
+  const goalPaceMin = parsePaceToMinutes(GOAL_PACE);
+  const steadyZone = ZONES.find((z) => z.name === 'Steady')!;
+  const steadyLo = parsePaceToMinutes(steadyZone.pace.split('–')[0]);
+
+  return weeks.map((w, i) => {
+    const base = easyMid + (goalPaceMin - easyMid) * (i / (weeks.length - 1));
+    // Cutback weeks ease off (slightly slower); the peak week sharpens (slightly faster) —
+    // reflects the plan's real periodization instead of a flat ramp.
+    const periodizationOffset = w.cutback ? 0.12 : w.peak ? -0.08 : 0;
+    const planned = base + periodizationOffset;
+    const inWeek = activities.filter(
+      (a) => a.sportType === 'Run' && a.date >= w.dateStart && a.date <= w.dateEnd && a.avgPaceMinKm >= steadyLo,
+    );
+    const actual = inWeek.length
+      ? Math.round((inWeek.reduce((s, a) => s + a.avgPaceMinKm, 0) / inWeek.length) * 100) / 100
+      : undefined;
+    return { weekId: w.id, label: w.num, actual, planned: Math.round(planned * 100) / 100 };
+  });
 }

@@ -36,6 +36,7 @@ export interface PhaseInfo {
   short: string;
   weeks: string;
   color: string;
+  blurb?: string;
 }
 
 export interface Zone {
@@ -79,6 +80,7 @@ export interface WorkoutLog {
   workoutId: string;
   date: string;
   exercises: Record<string, SetLog[]>;
+  exerciseDone?: Record<string, boolean>;
   completedAt?: string;
 }
 
@@ -97,4 +99,9 @@ export interface StravaActivity {
   movingTimeSec: number;
   avgPaceMinKm: number; // decimal minutes per km
   avgHR?: number;
+}
+
+export interface CoachMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }

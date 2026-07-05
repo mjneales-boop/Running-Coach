@@ -140,5 +140,24 @@ export function useStrength() {
     [strength],
   );
 
-  return { strength, loading: false, logSet, markComplete };
+  const markExerciseDone = useCallback(
+    async (date: string, workoutId: string, exerciseId: string, done: boolean) => {
+      const existing: SyncedLog = strength[date] ?? { workoutId, date, exercises: {} };
+      const updated: SyncedLog = {
+        ...existing,
+        exerciseDone: { ...existing.exerciseDone, [exerciseId]: done },
+        updatedAt: Date.now(),
+      };
+      const next = { ...strength, [date]: updated };
+      setStrength(next);
+      writeLocal(next);
+      if (!(await pushEntry(updated))) {
+        const ob = readOutbox().filter((e) => !(e.date === date && e.workoutId === workoutId));
+        writeOutbox([...ob, updated]);
+      }
+    },
+    [strength],
+  );
+
+  return { strength, loading: false, logSet, markComplete, markExerciseDone };
 }

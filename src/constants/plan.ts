@@ -15,12 +15,20 @@ export const ATHLETE = {
   baselineSleep: 7.2,
 };
 
+/** Shown on Daily when readiness has never been logged/synced (fresh install, Oura not connected). */
+export const SEED_READINESS = {
+  score: 84,
+  hrv: 108,
+  rhr: 44,
+  sleep: 7.4,
+};
+
 export const PHASES: PhaseInfo[] = [
   { num: 0, name: 'Pre-Ramp',               short: 'PRE',      weeks: 'pre1,pre2', color: '#2E6E75' },
-  { num: 1, name: 'Aerobic Base',            short: 'BASE',     weeks: '1-4',       color: '#2C7CB0' },
-  { num: 2, name: 'Strength / Threshold',    short: 'STRENGTH', weeks: '5-8',       color: '#2497CE' },
-  { num: 3, name: 'Marathon-Specific',       short: 'MARATHON', weeks: '9-12',      color: '#16B9DC' },
-  { num: 4, name: 'Sharpen + Taper',         short: 'TAPER',    weeks: '13-16',     color: '#00D9FF' },
+  { num: 1, name: 'Aerobic Base',            short: 'BASE',     weeks: '1-4',       color: '#2C7CB0', blurb: 'Aerobic foundation · easy volume' },
+  { num: 2, name: 'Strength / Threshold',    short: 'STRENGTH', weeks: '5-8',       color: '#2497CE', blurb: 'Hills, tempo & durability' },
+  { num: 3, name: 'Marathon-Specific',       short: 'MARATHON', weeks: '9-12',      color: '#16B9DC', blurb: 'Race-specific · MP work' },
+  { num: 4, name: 'Sharpen + Taper',         short: 'TAPER',    weeks: '13-16',     color: '#00D9FF', blurb: 'Sharpen, freshen & race' },
 ];
 
 export const ZONES: Zone[] = [

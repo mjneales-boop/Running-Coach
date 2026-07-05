@@ -1,20 +1,49 @@
 @import "tailwindcss";
 
+@theme {
+  --color-canvas: #0A0C0E;
+  --color-surface: #13171B;
+  --color-surface-2: #1A2026;
+  --color-field: #0E1216;
+  --color-ink: #F4F7FA;
+  --color-muted: #828D99;
+  --color-faint: #525B64;
+  --color-accent: #00D9FF;
+  --color-accent-ink: #001E24;
+  --color-accent-tint: rgb(0 217 255 / 0.12);
+  --color-accent-glow: rgb(0 217 255 / 0.28);
+  --color-warning: #E5675C;
+  --color-success: #10B981;
+  --color-hairline: rgb(255 255 255 / 0.08);
+  --color-hairline-strong: rgb(255 255 255 / 0.14);
+  --color-hairline-soft: rgb(255 255 255 / 0.06);
+
+  --font-display: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius-card: 16px;
+}
+
 :root {
-  --bg:           #0B0D0F;
-  --bg-2:         #13161A;
-  --bg-3:         #1A1E23;
-  --border:       #252B31;
-  --border-hover: #353D46;
-  --text:         #FFFFFF;
-  --text-dim:     #C8CDD4;
-  --text-muted:   #8A929C;
-  --accent:       #00D9FF;
-  --success:      #10B981;
-  --warn:         #F59E0B;
-  --danger:       #EF4444;
-  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  /* Legacy aliases for not-yet-migrated dashboard-era components
+     (Header, TodayCard, ReadinessBand, WeekStrip, Timeline, PacingZones,
+     StrengthView, TrainingInsights, MobileGymLog, SessionModal, ReadinessModal,
+     GymLogger). Remove each alias once its last referencing component is
+     replaced by the matching STRIDE screen (M1-M7) or deleted. */
+  --bg: var(--color-canvas);
+  --bg-2: var(--color-surface);
+  --bg-3: var(--color-surface-2);
+  --border: var(--color-hairline);
+  --border-hover: var(--color-hairline-strong);
+  --text: var(--color-ink);
+  --text-dim: #D3DAE1;
+  --text-muted: var(--color-muted);
+  --accent: var(--color-accent);
+  --success: var(--color-success);
+  --warn: #F59E0B;
+  --danger: var(--color-warning);
+  --mono: var(--font-mono);
+  --sans: var(--font-display);
 }
 
 *,
@@ -33,9 +62,11 @@ body,
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
+  background:
+    radial-gradient(120% 80% at 15% -5%, #14181d 0%, #0A0C0E 55%),
+    #060708;
+  color: var(--color-ink);
+  font-family: var(--font-display);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -59,4 +90,19 @@ input[type='number'] {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
   }
+}
+
+@keyframes stride-rise {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stride-rise {
+  animation: stride-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
