@@ -66,7 +66,7 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-canvas">
+    <div className="flex h-[100dvh] flex-col bg-canvas">
       <div className="stride-rise border-b border-hairline px-[22px] pb-4 pt-2">
         <div className="font-mono text-[11px] font-medium uppercase tracking-[0.24em] text-muted">
           In context · wk {currentWeek.num} {currentPhase.short.toLowerCase()}
@@ -93,7 +93,7 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
         )}
       </div>
 
-      <div className="border-t border-hairline bg-[rgba(10,12,14,0.6)] px-4 pb-[calc(92px+12px)] pt-2.5">
+      <div className="border-t border-hairline bg-[rgba(10,12,14,0.6)] px-4 pb-[calc(92px+env(safe-area-inset-bottom)+12px)] pt-2.5">
         <QuickPromptChips prompts={QUICK_PROMPTS} onSelect={submit} disabled={thinking} />
         <ChatInput value={input} onChange={setInput} onSend={() => submit(input)} disabled={thinking} />
       </div>

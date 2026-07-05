@@ -83,7 +83,12 @@ export default function App() {
             <ProgressScreen activeTab={tab} onTabChange={setTab} onOpenSettings={() => setSettingsOpen(true)} />
           )}
           {tab === 'plan' && (
-            <FullPlanScreen activeTab={tab} onTabChange={setTab} onOpenSettings={() => setSettingsOpen(true)} />
+            <FullPlanScreen
+              activeTab={tab}
+              onTabChange={setTab}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenSession={(weekId, dayAbbr) => setSessionModal({ weekId, dayAbbr })}
+            />
           )}
           {tab === 'coach' && <CoachScreen activeTab={tab} onTabChange={setTab} />}
         </>

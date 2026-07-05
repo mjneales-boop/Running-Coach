@@ -141,7 +141,7 @@ export function DailyScreen({
 
       <div className="stride-rise mb-3.5 flex items-baseline justify-between">
         <Eyebrow>Strength</Eyebrow>
-        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">2× / week</span>
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">5× / week</span>
       </div>
       {gymDay?.gym && (
         <StrengthLinkCard

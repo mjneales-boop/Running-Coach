@@ -17,7 +17,7 @@ export function usePlan(today: Date, viewedWeekIndex: number): PlanState {
     const cw = findCurrentWeek(today, WEEKS);
     const cwIdx = WEEKS.indexOf(cw);
     const vw = WEEKS[viewedWeekIndex] ?? cw;
-    const ts = findTodaySession(today, vw);
+    const ts = findTodaySession(today, cw);
     const phase = currentPhase(cw);
     const countdown = daysToRace(today);
 

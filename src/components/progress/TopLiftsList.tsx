@@ -2,16 +2,20 @@ import type { TopLift } from '../../lib/strength';
 
 interface TopLiftsListProps {
   lifts: TopLift[];
+  onOpenInsights: () => void;
 }
 
-export function TopLiftsList({ lifts }: TopLiftsListProps) {
+export function TopLiftsList({ lifts, onOpenInsights }: TopLiftsListProps) {
   const maxWeight = Math.max(...lifts.map((l) => l.weight), 1);
 
   return (
-    <div className="stride-rise rounded-[18px] border border-hairline bg-surface p-[22px]">
+    <div
+      onClick={onOpenInsights}
+      className="stride-rise cursor-pointer rounded-[18px] border border-hairline bg-surface p-[22px]"
+    >
       <div className="mb-1.5 flex items-baseline justify-between">
         <span className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-ink">Strength</span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">Top weight</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-accent">Insights →</span>
       </div>
       <div className="mb-2 font-mono text-[10.5px] tracking-[0.02em] text-muted">Top lifts · last 30 days</div>
 

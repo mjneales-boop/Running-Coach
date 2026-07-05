@@ -1,16 +1,19 @@
 import { WeekRow } from './WeekRow';
 import { weekFocus } from '../../lib/logic';
 import { PEAK_KM } from '../../constants/plan';
-import type { PhaseInfo, Week } from '../../types';
+import type { DayAbbr, PhaseInfo, Week } from '../../types';
 
 interface PhaseBandProps {
   phase: PhaseInfo;
   weeks: Week[];
   currentWeekId: string | undefined;
   isCurrentPhase: boolean;
+  openWeekId: string | null;
+  onToggleWeek: (weekId: string) => void;
+  onOpenDay: (weekId: string, dayAbbr: DayAbbr) => void;
 }
 
-export function PhaseBand({ phase, weeks, currentWeekId, isCurrentPhase }: PhaseBandProps) {
+export function PhaseBand({ phase, weeks, currentWeekId, isCurrentPhase, openWeekId, onToggleWeek, onOpenDay }: PhaseBandProps) {
   return (
     <div className="stride-rise pt-[26px]">
       <div className="flex items-baseline justify-between">
@@ -24,7 +27,16 @@ export function PhaseBand({ phase, weeks, currentWeekId, isCurrentPhase }: Phase
       {phase.blurb && <div className="mb-3 mt-1.5 font-mono text-[10.5px] tracking-[0.02em] text-muted">{phase.blurb}</div>}
       <div>
         {weeks.map((w) => (
-          <WeekRow key={w.id} week={w} focus={weekFocus(w)} maxKm={PEAK_KM} isCurrent={w.id === currentWeekId} />
+          <WeekRow
+            key={w.id}
+            week={w}
+            focus={weekFocus(w)}
+            maxKm={PEAK_KM}
+            isCurrent={w.id === currentWeekId}
+            open={w.id === openWeekId}
+            onToggle={() => onToggleWeek(w.id)}
+            onOpenDay={(dayAbbr) => onOpenDay(w.id, dayAbbr)}
+          />
         ))}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
@@ -7,18 +7,21 @@ import { RaceDayCard } from '../components/plan/RaceDayCard';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan, WEEKS } from '../hooks/usePlan';
 import { groupWeeksByPhase } from '../lib/logic';
+import type { DayAbbr } from '../types';
 
 interface FullPlanScreenProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   onOpenSettings: () => void;
+  onOpenSession: (weekId: string, dayAbbr: DayAbbr) => void;
 }
 
-export function FullPlanScreen({ activeTab, onTabChange, onOpenSettings }: FullPlanScreenProps) {
+export function FullPlanScreen({ activeTab, onTabChange, onOpenSettings, onOpenSession }: FullPlanScreenProps) {
   const today = useCurrentDate();
   const { currentWeekIndex } = usePlan(today, 0);
   const currentWeekId = WEEKS[currentWeekIndex]?.id;
   const currentPhaseNum = WEEKS[currentWeekIndex]?.phase;
+  const [openWeekId, setOpenWeekId] = useState<string | null>(currentWeekId ?? null);
 
   const realWeeks = useMemo(() => WEEKS.filter((w) => w.phase !== 0), []);
   const groups = useMemo(() => groupWeeksByPhase(realWeeks), [realWeeks]);
@@ -44,6 +47,9 @@ export function FullPlanScreen({ activeTab, onTabChange, onOpenSettings }: FullP
           weeks={g.weeks}
           currentWeekId={currentWeekId}
           isCurrentPhase={g.phase.num === currentPhaseNum}
+          openWeekId={openWeekId}
+          onToggleWeek={(weekId) => setOpenWeekId((cur) => (cur === weekId ? null : weekId))}
+          onOpenDay={onOpenSession}
         />
       ))}
 
