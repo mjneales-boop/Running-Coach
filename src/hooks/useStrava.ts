@@ -120,7 +120,7 @@ export function useStrava() {
   }, []);
 
   const disconnect = useCallback(async () => {
-    await fetch('/api/strava/disconnect', { method: 'POST' });
+    await fetch('/api/strava/status', { method: 'POST' });
     setConnected(false);
     setLastSynced(null);
   }, []);
