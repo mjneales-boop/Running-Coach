@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { CompletionEntry, DayAbbr } from '../types';
 
 type SyncedEntry = CompletionEntry & { weekId: string; day: DayAbbr; updatedAt?: number };
@@ -59,7 +59,14 @@ interface UseCompletion {
   setActual: (weekId: string, day: DayAbbr, actual: Partial<CompletionEntry>) => Promise<void>;
 }
 
-export function useCompletion(): UseCompletion {
+const CompletionContext = createContext<UseCompletion | null>(null);
+
+// Single instance lives in CompletionProvider (mounted once at the app root) so every
+// screen reads and writes the same state — otherwise each screen's own useCompletion()
+// call held an independent copy that only re-synced on remount, so a toggle made in one
+// still-mounted screen (e.g. the Daily card) never appeared in another (e.g. the Details
+// modal) until the user navigated away and back.
+export function CompletionProvider({ children }: { children: ReactNode }) {
   const [completion, setCompletion] = useState<CompletionMap>(readLocal);
   const syncing = useRef(false);
 
@@ -119,18 +126,22 @@ export function useCompletion(): UseCompletion {
 
   const write = useCallback(
     async (weekId: string, day: DayAbbr, patch: Partial<CompletionEntry>) => {
-      const key = `${weekId}-${day}`;
-      const existing = completion[key] ?? { done: false };
-      const updated: SyncedEntry = { ...existing, ...patch, weekId, day, updatedAt: Date.now() };
-      const next = { ...completion, [key]: updated };
-      setCompletion(next);
-      writeLocal(next);
-      if (!(await pushEntry(updated))) {
-        const ob = readOutbox().filter((e) => !(e.weekId === weekId && e.day === day));
-        writeOutbox([...ob, updated]);
-      }
+      setCompletion((prev) => {
+        const key = `${weekId}-${day}`;
+        const existing = prev[key] ?? { done: false };
+        const updated: SyncedEntry = { ...existing, ...patch, weekId, day, updatedAt: Date.now() };
+        const next = { ...prev, [key]: updated };
+        writeLocal(next);
+        void pushEntry(updated).then((ok) => {
+          if (!ok) {
+            const ob = readOutbox().filter((e) => !(e.weekId === weekId && e.day === day));
+            writeOutbox([...ob, updated]);
+          }
+        });
+        return next;
+      });
     },
-    [completion],
+    [],
   );
 
   const toggleDone = useCallback(
@@ -156,5 +167,12 @@ export function useCompletion(): UseCompletion {
     [write],
   );
 
-  return { completion, loading: false, toggleDone, setNotes, setActual };
+  const value: UseCompletion = { completion, loading: false, toggleDone, setNotes, setActual };
+  return <CompletionContext.Provider value={value}>{children}</CompletionContext.Provider>;
+}
+
+export function useCompletion(): UseCompletion {
+  const ctx = useContext(CompletionContext);
+  if (!ctx) throw new Error('useCompletion must be used within a CompletionProvider');
+  return ctx;
 }

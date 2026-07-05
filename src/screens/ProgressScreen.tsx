@@ -7,6 +7,7 @@ import { VolumeBarChart } from '../components/progress/VolumeBarChart';
 import { PaceLineChart } from '../components/progress/PaceLineChart';
 import { TopLiftsList } from '../components/progress/TopLiftsList';
 import { StrengthView } from '../components/StrengthView';
+import { Sheet } from '../components/ui/Sheet';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan, WEEKS } from '../hooks/usePlan';
 import { useCompletion } from '../hooks/useCompletion';
@@ -79,34 +80,24 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
       <TabBar active={activeTab} onChange={onTabChange} />
 
       {insightsOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.75)',
-            zIndex: 200,
-            overflowY: 'auto',
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setInsightsOpen(false); }}
-        >
-          <div className="min-h-screen bg-canvas px-[22px] pb-[60px] pt-6">
-            <div className="mb-5 flex items-center justify-between">
+        <Sheet
+          onClose={() => setInsightsOpen(false)}
+          headerLeft={
+            <div>
+              <div className="mb-1 font-mono text-[10.5px] font-medium uppercase tracking-[0.22em] text-muted">
+                Strength progression
+              </div>
               <h1
-                className="font-display text-[32px] font-extrabold uppercase leading-none tracking-[-0.01em]"
+                className="font-display text-[28px] font-extrabold uppercase leading-none tracking-[-0.01em]"
                 style={{ fontVariationSettings: "'wdth' 118" }}
               >
                 Insights
               </h1>
-              <button
-                onClick={() => setInsightsOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline text-xl text-muted"
-              >
-                ×
-              </button>
             </div>
-            <StrengthView strength={strength} />
-          </div>
-        </div>
+          }
+        >
+          <StrengthView strength={strength} />
+        </Sheet>
       )}
     </div>
   );

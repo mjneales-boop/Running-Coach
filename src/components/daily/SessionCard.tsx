@@ -7,6 +7,7 @@ import type { Day } from '../../types';
 interface SessionCardRestProps {
   variant: 'rest';
   weekMeta: string;
+  done: boolean;
   onComplete: () => void;
   onDetails: () => void;
 }
@@ -15,13 +16,14 @@ interface SessionCardRunProps {
   variant: 'run';
   weekMeta: string;
   day: Day;
+  done: boolean;
   onStart: () => void;
   onDetails: () => void;
 }
 
 type SessionCardProps = SessionCardRestProps | SessionCardRunProps;
 
-function StatBlock({ label, value, unit, isFirst }: { label: string; value: string; unit: string; isFirst?: boolean }) {
+export function StatBlock({ label, value, unit, isFirst }: { label: string; value: string; unit: string; isFirst?: boolean }) {
   return (
     <div className={`pt-4 ${isFirst ? '' : 'border-l border-hairline pl-1'}`}>
       <div className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">{label}</div>
@@ -35,7 +37,7 @@ function StatBlock({ label, value, unit, isFirst }: { label: string; value: stri
 
 export function SessionCard(props: SessionCardProps) {
   if (props.variant === 'rest') {
-    const { weekMeta, onComplete, onDetails } = props;
+    const { weekMeta, done, onComplete, onDetails } = props;
     return (
       <div className="stride-rise mb-[26px] rounded-[18px] border border-hairline bg-surface p-[22px]">
         <div className="mb-1.5 flex items-center justify-between">
@@ -53,8 +55,8 @@ export function SessionCard(props: SessionCardProps) {
           <p className="max-w-[40ch] text-[15.5px] leading-normal text-[#D3DAE1]">{restDayNote()}</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="primary" className="flex-1" onClick={onComplete}>
-            Complete
+          <Button variant={done ? 'ghost' : 'primary'} className="flex-1" onClick={onComplete}>
+            {done ? '✓ Completed — Undo' : 'Complete'}
           </Button>
           <Button variant="ghost" className="flex-1" onClick={onDetails}>
             Details
@@ -64,7 +66,7 @@ export function SessionCard(props: SessionCardProps) {
     );
   }
 
-  const { weekMeta, day, onStart, onDetails } = props;
+  const { weekMeta, day, done, onStart, onDetails } = props;
   const label = SESSION_TYPE_LABEL[day.type];
   const zone = zoneForPace(day.pace);
   const duration = estimateDuration(day);
@@ -99,8 +101,8 @@ export function SessionCard(props: SessionCardProps) {
         <p className="max-w-[40ch] text-[15.5px] leading-normal text-[#D3DAE1]">{runDayNote(day)}</p>
       </div>
       <div className="flex gap-3">
-        <Button variant="primary" className="flex-1" onClick={onStart}>
-          Start run
+        <Button variant={done ? 'ghost' : 'primary'} className="flex-1" onClick={onStart}>
+          {done ? '✓ Completed — Undo' : 'Start run'}
         </Button>
         <Button variant="ghost" className="flex-1" onClick={onDetails}>
           Details

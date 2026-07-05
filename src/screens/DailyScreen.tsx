@@ -75,6 +75,7 @@ export function DailyScreen({
   const gymDay = nextGymDay(today, currentWeek);
   const todayStr = localDateKey(today);
   const isRest = !todaySession || todaySession.type === 'REST';
+  const todayDone = todaySession ? !!completion[`${currentWeek.id}-${todaySession.d}`]?.done : false;
 
   return (
     <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">
@@ -93,6 +94,7 @@ export function DailyScreen({
         <SessionCard
           variant="rest"
           weekMeta={`Wk ${currentWeek.num} · ${currentPhase.short.toLowerCase()}`}
+          done={todayDone}
           onComplete={onCompleteToday}
           onDetails={onOpenDetails}
         />
@@ -102,6 +104,7 @@ export function DailyScreen({
             variant="run"
             weekMeta={`Wk ${currentWeek.num} · ${currentPhase.short.toLowerCase()}`}
             day={todaySession}
+            done={todayDone}
             onStart={onCompleteToday}
             onDetails={onOpenDetails}
           />

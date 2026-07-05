@@ -10,7 +10,7 @@ import { SessionModal } from './components/SessionModal';
 import { ReadinessModal } from './components/ReadinessModal';
 import type { TabKey } from './components/ui/TabBar';
 import { useCurrentDate } from './hooks/useCurrentDate';
-import { useCompletion } from './hooks/useCompletion';
+import { CompletionProvider, useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
 import { useSwaps } from './hooks/useSwaps';
 import { useStrength } from './hooks/useStrength';
@@ -27,6 +27,14 @@ interface SessionModalTarget {
 }
 
 export default function App() {
+  return (
+    <CompletionProvider>
+      <AppShell />
+    </CompletionProvider>
+  );
+}
+
+function AppShell() {
   const today = useCurrentDate();
 
   const [tab, setTab] = useState<TabKey>('daily');

@@ -14,9 +14,9 @@ import type { WorkoutLog } from '../types';
 
 const WORKOUT_ORDER = ['chestback', 'shouldersarms', 'legs'] as const;
 const WORKOUT_LABELS: Record<string, string> = {
-  chestback: 'chest / back',
-  shouldersarms: 'shoulders / arms',
-  legs: 'legs',
+  chestback: 'Chest / Back',
+  shouldersarms: 'Shoulders / Arms',
+  legs: 'Legs',
 };
 
 interface StrengthViewProps {
@@ -94,42 +94,19 @@ export function StrengthView({ strength }: StrengthViewProps) {
     return template?.blocks.flatMap((b) => b.exercises).find((e) => e.id === selectedExercise)?.name ?? '';
   }, [selectedWorkout, selectedExercise]);
 
+  const latestValue = chartData.length > 0 ? chartData[chartData.length - 1].value : null;
+
   return (
     <div>
-      {/* Section label */}
-      <div
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 14,
-          fontWeight: 500,
-          letterSpacing: '0.02em',
-          color: 'var(--text-muted)',
-          textTransform: 'lowercase',
-          marginBottom: 24,
-        }}
-      >
-        // strength progression
-      </div>
-
-      {/* Workout group tabs */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
+      {/* Muscle group tabs */}
+      <div className="mb-6 flex gap-6 border-b border-hairline">
         {WORKOUT_ORDER.map((wid) => (
           <button
             key={wid}
             onClick={() => handleWorkoutChange(wid)}
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 12,
-              padding: '8px 16px',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: selectedWorkout === wid ? 'var(--accent)' : 'var(--text-muted)',
-              borderBottom: selectedWorkout === wid ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: '-1px',
-              letterSpacing: '0.04em',
-              transition: 'color 150ms, border-color 150ms',
-            }}
+            className={`-mb-px border-b-2 pb-3 font-display text-[13px] font-bold uppercase tracking-[0.03em] ${
+              selectedWorkout === wid ? 'border-accent text-accent' : 'border-transparent text-muted'
+            }`}
           >
             {WORKOUT_LABELS[wid]}
           </button>
@@ -137,91 +114,70 @@ export function StrengthView({ strength }: StrengthViewProps) {
       </div>
 
       {/* Exercise selector */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {trackedExercises.map((ex) => (
-          <button
-            key={ex.id}
-            onClick={() => setSelectedExercise(ex.id)}
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 11,
-              padding: '5px 12px',
-              borderRadius: 20,
-              border: `1px solid ${selectedExercise === ex.id ? 'var(--accent)' : 'var(--border)'}`,
-              background: selectedExercise === ex.id ? 'rgba(0,217,255,0.08)' : 'var(--bg-3)',
-              color: selectedExercise === ex.id ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              letterSpacing: '0.04em',
-              transition: 'border-color 150ms, color 150ms, background 150ms',
-            }}
-          >
-            {ex.name}
-          </button>
-        ))}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {trackedExercises.map((ex) => {
+          const isActive = selectedExercise === ex.id;
+          return (
+            <button
+              key={ex.id}
+              onClick={() => setSelectedExercise(ex.id)}
+              className={`rounded-full border px-3.5 py-2 font-display text-[12.5px] font-semibold transition-colors ${
+                isActive
+                  ? 'border-[rgba(0,217,255,0.4)] bg-accent-tint text-accent'
+                  : 'border-hairline text-muted'
+              }`}
+            >
+              {ex.name}
+            </button>
+          );
+        })}
       </div>
 
       {/* Metric toggle + PR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex gap-1.5 rounded-xl border border-hairline bg-field p-1">
           {(['topSet', 'est1RM'] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMetric(m)}
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 11,
-                padding: '4px 10px',
-                borderRadius: 4,
-                border: `1px solid ${metric === m ? 'var(--accent)' : 'var(--border)'}`,
-                background: metric === m ? 'rgba(0,217,255,0.08)' : 'transparent',
-                color: metric === m ? 'var(--accent)' : 'var(--text-muted)',
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-                transition: 'border-color 150ms, color 150ms',
-              }}
+              className={`rounded-lg px-3 py-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.08em] transition-colors ${
+                metric === m ? 'bg-accent text-accent-ink' : 'text-muted'
+              }`}
             >
-              {m === 'topSet' ? 'top set' : 'est. 1rm'}
+              {m === 'topSet' ? 'Top set' : 'Est. 1RM'}
             </button>
           ))}
         </div>
 
-        {prData && (
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
-              pr
+        {latestValue != null && (
+          <div className="text-right">
+            <div className="font-display text-2xl font-extrabold text-accent">
+              {latestValue}
+              <span className="ml-0.5 text-xs font-medium text-muted">kg</span>
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
-              {prData.bestSet.weight}kg × {prData.bestSet.reps ?? '?'}
-              {prData.best1RM > 0 && (
-                <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> · est. 1RM {prData.best1RM}kg</span>
-              )}
-            </div>
+            {prData && (
+              <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.06em] text-faint">
+                PR {prData.bestSet.weight} kg × {prData.bestSet.reps ?? '?'}
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Chart */}
-      <div
-        style={{
-          background: 'var(--bg-2)',
-          border: '1px solid var(--border)',
-          borderRadius: 12,
-          padding: '20px 16px 12px',
-          marginBottom: 24,
-        }}
-      >
+      <div className="mb-6 rounded-2xl border border-hairline bg-surface px-2.5 pb-1 pt-5">
         {series.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-hairline)" vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fontFamily: 'var(--mono)', fontSize: 10, fill: 'var(--text-muted)' }}
-                axisLine={{ stroke: 'var(--border)' }}
+                tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--color-muted)' }}
+                axisLine={{ stroke: 'var(--color-hairline)' }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontFamily: 'var(--mono)', fontSize: 10, fill: 'var(--text-muted)' }}
+                tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--color-muted)' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `${v}kg`}
@@ -229,12 +185,12 @@ export function StrengthView({ strength }: StrengthViewProps) {
               />
               <Tooltip
                 contentStyle={{
-                  background: 'var(--bg-3)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  fontFamily: 'var(--mono)',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-hairline)',
+                  borderRadius: 10,
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 12,
-                  color: 'var(--text)',
+                  color: 'var(--color-ink)',
                 }}
                 formatter={(value) => [`${value}kg`, metric === 'topSet' ? 'Top set' : 'Est. 1RM']}
                 labelFormatter={(label) => `Date: ${label}`}
@@ -242,24 +198,16 @@ export function StrengthView({ strength }: StrengthViewProps) {
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#00D9FF"
+                stroke="var(--color-accent)"
                 strokeWidth={2}
-                dot={{ fill: '#00D9FF', r: 4 }}
+                dot={{ fill: 'var(--color-accent)', r: 4 }}
                 activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div style={{
-            height: 200,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'var(--mono)',
-            fontSize: 13,
-            color: 'var(--text-muted)',
-          }}>
-            no data yet — log your first session
+          <div className="flex h-[200px] items-center justify-center font-mono text-[13px] text-faint">
+            No data yet — log your first session
           </div>
         )}
       </div>
@@ -267,15 +215,7 @@ export function StrengthView({ strength }: StrengthViewProps) {
       {/* Recent sessions */}
       {recentSessions.length > 0 && (
         <div>
-          <div style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
-            fontWeight: 500,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            marginBottom: 12,
-          }}>
+          <div className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted">
             Recent — {selectedExerciseName}
           </div>
           {recentSessions.map((log) => {
@@ -286,24 +226,10 @@ export function StrengthView({ strength }: StrengthViewProps) {
               .join(', ');
             const dateLabel = new Date(log.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             return (
-              <div
-                key={log.date}
-                style={{
-                  display: 'flex',
-                  gap: 16,
-                  padding: '8px 0',
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', minWidth: 56 }}>
-                  {dateLabel}
-                </span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-dim)' }}>
-                  {summary || '—'}
-                </span>
-                {log.completedAt && (
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--success)', marginLeft: 'auto' }}>✓</span>
-                )}
+              <div key={log.date} className="flex items-center gap-4 border-t border-hairline-soft py-3 first:border-t-0">
+                <span className="w-14 flex-none font-mono text-[11.5px] text-muted">{dateLabel}</span>
+                <span className="flex-1 text-[13.5px] text-[#D3DAE1]">{summary || '—'}</span>
+                {log.completedAt && <span className="flex-none text-accent">✓</span>}
               </div>
             );
           })}

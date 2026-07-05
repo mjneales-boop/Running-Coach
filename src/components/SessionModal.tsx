@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pill } from './ui/Pill';
+import { Sheet } from './ui/Sheet';
+import { Tag } from './ui/Tag';
+import { Button } from './ui/Button';
+import { StatBlock } from './daily/SessionCard';
 import { GymLogger } from './GymLogger';
-import { isHardSession } from '../lib/logic';
 import { guideEntriesForDay } from '../lib/coaching';
+import { estimateDuration, zoneForPace } from '../lib/logic';
+import { SESSION_TYPE_LABEL } from '../lib/coachNotes';
 import { WORKOUTS } from '../constants/workouts';
 import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog, StravaActivity, SessionExerciseOverrides } from '../types';
 
@@ -73,506 +77,250 @@ export function SessionModal({
 
   if (!day) return null;
 
-  const hard = isHardSession(day.type);
+  const label = SESSION_TYPE_LABEL[day.type];
   const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
+    weekday: 'short', month: 'short', day: 'numeric',
   });
-
-  const inputStyle: React.CSSProperties = {
-    fontFamily: 'var(--mono)',
-    fontSize: 14,
-    background: 'var(--bg-3)',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    color: 'var(--text)',
-    padding: '12px 14px',
-    resize: 'vertical',
-    minHeight: 80,
-    width: '100%',
-    outline: 'none',
-    transition: 'border-color 150ms ease',
-  };
+  const guides = guideEntriesForDay(day);
+  const zone = zoneForPace(day.pace);
+  const duration = estimateDuration(day);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.75)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 200,
-        padding: '20px',
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        style={{
-          background: 'var(--bg-2)',
-          border: `1px solid ${hard ? 'var(--accent)' : 'var(--border)'}`,
-          borderRadius: 12,
-          width: '100%',
-          maxWidth: 560,
-          padding: 28,
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: hard ? '0 0 40px rgba(0,217,255,0.06)' : 'none',
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: showTabs ? 0 : 18,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Pill type={day.type} />
-            <span
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 13,
-                color: 'var(--text-muted)',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {dateLabel.toUpperCase()}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              fontSize: 20,
-              lineHeight: 1,
-              padding: '0 4px',
-            }}
-          >
-            ×
-          </button>
+    <Sheet
+      onClose={onClose}
+      headerLeft={
+        <div className="flex items-center gap-3">
+          <Tag tone="accent">{label}</Tag>
+          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{dateLabel}</span>
         </div>
-
-        {/* Tabs */}
-        {showTabs && (
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 18, marginTop: 14 }}>
-            {([runLabel, 'gym'] as const).map((tab) => (
+      }
+    >
+      {showTabs && (
+        <div className="mb-5 flex gap-6 border-b border-hairline">
+          {([runLabel, 'gym'] as const).map((tab) => {
+            const isActive = tab === runLabel ? activeTab === 'run' : activeTab === 'gym';
+            return (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab === runLabel ? 'run' : 'gym')}
-                style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: 13,
-                  padding: '8px 16px',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: (tab === runLabel ? activeTab === 'run' : activeTab === 'gym') ? 'var(--accent)' : 'var(--text-muted)',
-                  borderBottom: (tab === runLabel ? activeTab === 'run' : activeTab === 'gym') ? '2px solid var(--accent)' : '2px solid transparent',
-                  marginBottom: '-1px',
-                  letterSpacing: '0.04em',
-                  transition: 'color 150ms, border-color 150ms',
-                }}
+                className={`-mb-px border-b-2 pb-3 font-display text-[13px] font-bold uppercase tracking-[0.04em] ${
+                  isActive ? 'border-accent text-accent' : 'border-transparent text-muted'
+                }`}
               >
                 {tab}
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
 
-        {/* Run / Cardio tab content */}
-        {(!showTabs || activeTab === 'run') && (
-          <>
-            {/* Title */}
-            <div
-              style={{
-                fontFamily: 'var(--sans)',
-                fontWeight: 900,
-                fontSize: 28,
-                letterSpacing: '-0.02em',
-                lineHeight: 1.1,
-                color: 'var(--text)',
-                marginBottom: 20,
-              }}
-            >
-              {day.title}
+      {(!showTabs || activeTab === 'run') && (
+        <>
+          <h1
+            className="mb-4 font-display text-[42px] font-extrabold uppercase leading-[0.92] tracking-[-0.01em]"
+            style={{ fontVariationSettings: "'wdth' 110" }}
+          >
+            {label}
+          </h1>
+
+          {guides[0] && (
+            <p className="mb-6 max-w-[38ch] text-[17px] font-semibold leading-snug text-ink">{guides[0].oneLiner}</p>
+          )}
+
+          {hasCardio && (
+            <div className="mb-6 grid grid-cols-3 gap-0.5 border-t border-hairline">
+              <StatBlock label="Distance" value={day.km != null ? String(day.km) : '—'} unit="km" isFirst />
+              <StatBlock label="Pace" value={day.pace ?? '—'} unit="/km" />
+              <StatBlock label="Est." value={duration ?? '—'} unit="h" />
             </div>
+          )}
 
-            {/* Stats */}
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 16,
-                marginBottom: 18,
-              }}
-            >
-              {day.km != null && (
-                <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Distance</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.km} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>km</span></div>
-                </div>
-              )}
-              {day.duration != null && (
-                <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Duration</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.duration} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>min</span></div>
-                </div>
-              )}
-              {day.pace && (
-                <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Pace</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.pace} <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>/km</span></div>
-                </div>
-              )}
-              {day.strides && (
-                <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Strides</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.strides}</div>
-                </div>
-              )}
-              {day.gym && (
-                <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>Gym</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{day.gym}</div>
-                </div>
-              )}
+          {zone && (
+            <div className="mb-6 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">Zone</span>
+              <Tag tone="accent">
+                {zone.name} {zone.pace}
+              </Tag>
             </div>
+          )}
 
-            {/* Strava activity badge */}
-            {stravaActivities?.[day.date] && (() => {
-              const act = stravaActivities[day.date];
-              const totalSec = Math.round(act.avgPaceMinKm * 60);
-              const pace = `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
-              return (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    marginBottom: 18,
-                    padding: '10px 14px',
-                    background: 'rgba(252,76,2,0.06)',
-                    border: '1px solid rgba(252,76,2,0.25)',
-                    borderRadius: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--mono)',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      color: '#FC4C02',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    via strava
-                  </span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-dim)' }}>
-                    {act.distanceKm} km&nbsp;&nbsp;·&nbsp;&nbsp;{pace} /km
-                    {act.avgHR != null && <>&nbsp;&nbsp;·&nbsp;&nbsp;{act.avgHR} bpm</>}
-                  </span>
-                </div>
-              );
-            })()}
-
-            {/* Coach note */}
-            {day.notes && (
-              <div
-                style={{
-                  background: 'var(--bg-3)',
-                  borderLeft: `2px solid ${hard ? 'var(--accent)' : 'var(--border-hover)'}`,
-                  borderRadius: '0 8px 8px 0',
-                  padding: '12px 16px',
-                  marginBottom: 18,
-                }}
-              >
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>// coach</div>
-                <div style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)' }}>{day.notes}</div>
-              </div>
-            )}
-
-            {/* Coaching guide */}
-            {(() => {
-              const guides = guideEntriesForDay(day);
-              if (guides.length === 0) return null;
-              return (
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ height: 1, background: 'var(--border)', margin: '0 0 20px' }} />
-                  {guides.map((g, gi) => (
-                    <div key={g.key}>
-                      {gi > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '20px 0' }} />}
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 12.5, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.06em', marginBottom: 10 }}>
-                        {'// ' + g.label}
-                      </div>
-                      <p style={{ fontFamily: 'var(--sans)', fontSize: 15, lineHeight: 1.5, color: 'var(--text-dim)', margin: '0 0 14px' }}>
-                        {g.oneLiner}
-                      </p>
-                      {(['what', 'why', 'how it should feel'] as const).map((h) => {
-                        const body = h === 'what' ? g.what : h === 'why' ? g.why : g.feel;
-                        return (
-                          <div key={h} style={{ marginBottom: 12 }}>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>{h}</div>
-                            <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>{body}</p>
-                          </div>
-                        );
-                      })}
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 5 }}>execute</div>
-                        <ul style={{ paddingLeft: 16, margin: 0 }}>
-                          {g.execute.map((cue, i) => (
-                            <li key={i} style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 2 }}>{cue}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warn)', marginBottom: 5 }}>avoid</div>
-                        <p style={{ fontFamily: 'var(--sans)', fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', fontStyle: 'italic', margin: 0 }}>{g.mistake}</p>
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 0' }} />
-                </div>
-              );
-            })()}
-
-            {/* Notes textarea */}
-            <div style={{ marginBottom: 18 }}>
-              <div
-                style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: 11.5,
-                  fontWeight: 500,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                  marginBottom: 8,
-                }}
-              >
-                Your Notes
-              </div>
-              <textarea
-                ref={textareaRef}
-                placeholder="How did it go? HR, effort, notes..."
-                style={{
-                  ...inputStyle,
-                  lineHeight: 1.6,
-                }}
-                onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border-hover)'; }}
-                onBlur={(e) => {
-                  (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)';
-                  onSetNotes(weekId, dayAbbr, (e.target as HTMLTextAreaElement).value);
-                }}
-              />
-            </div>
-
-            {/* Reschedule */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
-                  // reschedule
+          {stravaActivities?.[day.date] && (() => {
+            const act = stravaActivities[day.date];
+            const totalSec = Math.round(act.avgPaceMinKm * 60);
+            const pace = `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
+            return (
+              <div className="mb-6 flex items-center gap-3 rounded-xl border border-[rgba(252,76,2,0.25)] bg-[rgba(252,76,2,0.06)] px-3.5 py-2.5">
+                <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#FC4C02]">
+                  via strava
                 </span>
-                {swapMap[dayAbbr] && (
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--warn)', letterSpacing: '0.03em' }}>
-                    ↕ moved here from {swapMap[dayAbbr]!.toUpperCase()}
-                  </span>
-                )}
+                <span className="font-mono text-[12.5px] text-muted">
+                  {act.distanceKm} km · {pace} /km
+                  {act.avgHR != null && <> · {act.avgHR} bpm</>}
+                </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {week.days
-                  .filter((d) => d.d !== dayAbbr)
-                  .map((d) => {
-                    const isSwapPartner = swapMap[dayAbbr] === d.d;
+            );
+          })()}
+
+          {day.notes && (
+            <div className="mb-6 border-l-2 border-accent py-0.5 pl-4">
+              <div className="mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.2em] text-accent">Coach</div>
+              <p className="max-w-[42ch] text-[15px] leading-normal text-[#D3DAE1]">{day.notes}</p>
+            </div>
+          )}
+
+          {guides.length > 0 && (
+            <div className="mb-6 flex flex-col gap-6">
+              {guides.map((g, gi) => (
+                <div key={g.key} className={gi > 0 ? 'border-t border-hairline pt-6' : ''}>
+                  {(['what', 'why', 'how it should feel'] as const).map((h) => {
+                    const body = h === 'what' ? g.what : h === 'why' ? g.why : g.feel;
                     return (
-                      <button
-                        key={d.d}
-                        onClick={() => onSwapDay(dayAbbr, d.d)}
-                        style={{
-                          fontFamily: 'var(--mono)',
-                          fontSize: 12,
-                          padding: '6px 12px',
-                          borderRadius: 6,
-                          border: `1px solid ${isSwapPartner ? 'var(--accent)' : 'var(--border)'}`,
-                          background: isSwapPartner ? 'rgba(0,217,255,0.08)' : 'var(--bg-3)',
-                          color: isSwapPartner ? 'var(--accent)' : 'var(--text-muted)',
-                          cursor: 'pointer',
-                          letterSpacing: '0.04em',
-                          transition: 'border-color 150ms, color 150ms, background 150ms',
-                        }}
-                      >
-                        {d.d.toUpperCase()} · {d.type.toLowerCase()}
-                      </button>
+                      <div key={h} className="mb-4">
+                        <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted">{h}</div>
+                        <p className="text-[15px] leading-normal text-[#D3DAE1]">{body}</p>
+                      </div>
                     );
                   })}
-              </div>
-            </div>
-
-            {/* Gym session management */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
-                  // gym
-                </span>
-                {hasGym ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--accent)' }}>{day.gym}</span>
-                    <button
-                      onClick={() => onRemoveGym(day.date)}
-                      style={{
-                        fontFamily: 'var(--mono)',
-                        fontSize: 11,
-                        padding: '4px 10px',
-                        borderRadius: 5,
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-3)',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        letterSpacing: '0.03em',
-                      }}
-                    >
-                      remove
-                    </button>
+                  <div className="mb-4">
+                    <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted">Execute</div>
+                    <ul className="flex flex-col gap-1.5">
+                      {g.execute.map((cue, i) => (
+                        <li key={i} className="flex gap-2 text-[15px] leading-normal text-[#D3DAE1]">
+                          <span className="mt-[9px] h-1 w-1 flex-none rounded-full bg-accent" />
+                          {cue}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                ) : (
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      onClick={() => setShowAddGymPicker((v) => !v)}
-                      style={{
-                        fontFamily: 'var(--mono)',
-                        fontSize: 11,
-                        padding: '4px 10px',
-                        borderRadius: 5,
-                        border: '1px dashed var(--border)',
-                        background: 'var(--bg-3)',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        letterSpacing: '0.03em',
-                        transition: 'border-color 150ms, color 150ms',
-                      }}
-                    >
-                      + add gym session
-                    </button>
-                    {showAddGymPicker && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 6px)',
-                          right: 0,
-                          zIndex: 10,
-                          background: 'var(--bg-2)',
-                          border: '1px solid var(--border-hover)',
-                          borderRadius: 8,
-                          padding: '6px 0',
-                          minWidth: 160,
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                        }}
-                      >
-                        {GYM_OPTIONS.map((opt) => (
-                          <button
-                            key={opt.id}
-                            onClick={() => {
-                              onAddGym(day.date, opt.name, opt.id);
-                              setShowAddGymPicker(false);
-                            }}
-                            style={{
-                              display: 'block',
-                              width: '100%',
-                              textAlign: 'left',
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontFamily: 'var(--mono)',
-                              fontSize: 12,
-                              color: 'var(--text-dim)',
-                              padding: '8px 14px',
-                            }}
-                            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-3)')}
-                            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = 'transparent')}
-                          >
-                            {opt.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  <div>
+                    <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-warning">Avoid</div>
+                    <p className="text-[15px] italic leading-normal text-[#D3DAE1]">{g.mistake}</p>
                   </div>
-                )}
-              </div>
+                </div>
+              ))}
             </div>
+          )}
 
-            {/* If done, show completedAt */}
-            {entry.done && entry.completedAt && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--success)', marginBottom: 16 }}>
-                ✓ Completed {new Date(entry.completedAt).toLocaleString()}
-              </div>
-            )}
-
-            {/* Mark complete button */}
-            <button
-              onClick={() => onToggleDone(weekId, dayAbbr)}
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 13,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                borderRadius: 8,
-                padding: '14px 22px',
-                cursor: 'pointer',
-                border: `1px solid ${entry.done ? 'var(--success)' : 'var(--accent)'}`,
-                background: entry.done ? 'var(--success)' : 'var(--accent)',
-                color: '#04222A',
-                transition: 'background 150ms ease, border-color 150ms ease',
-                width: '100%',
-              }}
-            >
-              {entry.done ? '✓ Completed — Undo' : 'Mark Complete'}
-            </button>
-          </>
-        )}
-
-        {/* Gym tab content */}
-        {showTabs && activeTab === 'gym' && (
-          <>
-            <GymLogger
-              day={day}
-              weekId={weekId}
-              strength={strength}
-              onLogSet={onLogSet}
-              onMarkComplete={onMarkStrengthComplete}
-              onToggleDone={onToggleDone}
-              completion={completion}
-              exerciseOverrides={exerciseOverrides}
-              onSetSessionExercises={onSetSessionExercises}
+          <div className="mb-6">
+            <div className="mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.2em] text-muted">
+              Your notes
+            </div>
+            <textarea
+              ref={textareaRef}
+              placeholder="How did it go? HR, effort, notes..."
+              className="min-h-[80px] w-full resize-y rounded-xl border border-hairline bg-field p-3.5 text-sm leading-normal text-ink outline-none transition-colors focus:border-hairline-strong"
+              onBlur={(e) => onSetNotes(weekId, dayAbbr, e.target.value)}
             />
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <button
-                onClick={() => { onRemoveGym(day.date); onClose(); }}
-                style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: 12,
-                  padding: '8px 14px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  background: 'transparent',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  letterSpacing: '0.03em',
-                }}
-              >
-                remove gym from this day
-              </button>
+          </div>
+
+          <div className="mb-6 border-t border-hairline pt-5">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted">Reschedule</span>
+              {swapMap[dayAbbr] && (
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-warning">
+                  ↕ moved here from {swapMap[dayAbbr]!.toUpperCase()}
+                </span>
+              )}
             </div>
-          </>
-        )}
-      </div>
-    </div>
+            <div className="flex flex-wrap gap-2">
+              {week.days
+                .filter((d) => d.d !== dayAbbr)
+                .map((d) => {
+                  const isSwapPartner = swapMap[dayAbbr] === d.d;
+                  return (
+                    <button
+                      key={d.d}
+                      onClick={() => onSwapDay(dayAbbr, d.d)}
+                      className={`rounded-lg border px-3 py-1.5 font-mono text-[11.5px] uppercase tracking-[0.05em] transition-colors ${
+                        isSwapPartner
+                          ? 'border-[rgba(0,217,255,0.4)] bg-accent-tint text-accent'
+                          : 'border-hairline text-muted'
+                      }`}
+                    >
+                      {d.d} · {d.type.toLowerCase()}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+
+          <div className="mb-6 border-t border-hairline pt-5">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted">Gym</span>
+              {hasGym ? (
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-[11.5px] text-accent">{day.gym}</span>
+                  <button
+                    onClick={() => onRemoveGym(day.date)}
+                    className="rounded-lg border border-hairline px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.05em] text-muted"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAddGymPicker((v) => !v)}
+                    className="rounded-lg border border-dashed border-hairline-strong px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.05em] text-muted"
+                  >
+                    + Add gym session
+                  </button>
+                  {showAddGymPicker && (
+                    <div className="absolute right-0 top-[calc(100%+6px)] z-10 min-w-[170px] overflow-hidden rounded-xl border border-hairline-strong bg-surface py-1.5 shadow-xl">
+                      {GYM_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => {
+                            onAddGym(day.date, opt.name, opt.id);
+                            setShowAddGymPicker(false);
+                          }}
+                          className="block w-full px-3.5 py-2.5 text-left font-mono text-[12px] text-[#D3DAE1]"
+                        >
+                          {opt.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {entry.done && entry.completedAt && (
+            <div className="mb-4 font-mono text-xs text-success">
+              ✓ Completed {new Date(entry.completedAt).toLocaleString()}
+            </div>
+          )}
+
+          <Button variant="primary" className="w-full" onClick={() => onToggleDone(weekId, dayAbbr)}>
+            {entry.done ? '✓ Completed — Undo' : 'Mark complete'}
+          </Button>
+        </>
+      )}
+
+      {showTabs && activeTab === 'gym' && (
+        <>
+          <GymLogger
+            day={day}
+            weekId={weekId}
+            strength={strength}
+            onLogSet={onLogSet}
+            onMarkComplete={onMarkStrengthComplete}
+            onToggleDone={onToggleDone}
+            completion={completion}
+            exerciseOverrides={exerciseOverrides}
+            onSetSessionExercises={onSetSessionExercises}
+          />
+          <div className="mt-4 border-t border-hairline pt-4">
+            <button
+              onClick={() => { onRemoveGym(day.date); onClose(); }}
+              className="rounded-lg border border-hairline px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.05em] text-muted"
+            >
+              Remove gym from this day
+            </button>
+          </div>
+        </>
+      )}
+    </Sheet>
   );
 }
