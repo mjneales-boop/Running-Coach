@@ -1,35 +1,20 @@
-import { useState, useCallback, useEffect } from 'react';
-import storage from '../lib/storage';
+import { useCallback } from 'react';
+import { createSyncedBlob } from './createSyncedBlob';
 import type { GymOverrides, GymOverrideEntry } from '../types';
 
-const STORAGE_KEY = 'marathon-gym-overrides';
+const { Provider: GymScheduleProvider, useSyncedBlob: useGymOverridesBlob } = createSyncedBlob<GymOverrides>('gymOverrides', {});
+export { GymScheduleProvider };
 
 export function useGymSchedule() {
-  const [gymOverrides, setGymOverrides] = useState<GymOverrides>({});
-
-  useEffect(() => {
-    storage.get(STORAGE_KEY).then((result) => {
-      if (result?.value) {
-        try { setGymOverrides(JSON.parse(result.value) as GymOverrides); } catch {}
-      }
-    });
-  }, []);
+  const { value: gymOverrides, update } = useGymOverridesBlob();
 
   const setGymOnDay = useCallback((date: string, gym: string, workoutId: string) => {
-    setGymOverrides((prev) => {
-      const next = { ...prev, [date]: { gym, workoutId } satisfies GymOverrideEntry };
-      storage.set(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+    update((prev) => ({ ...prev, [date]: { gym, workoutId } satisfies GymOverrideEntry }));
+  }, [update]);
 
   const removeGymFromDay = useCallback((date: string) => {
-    setGymOverrides((prev) => {
-      const next = { ...prev, [date]: { gym: null, workoutId: null } satisfies GymOverrideEntry };
-      storage.set(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+    update((prev) => ({ ...prev, [date]: { gym: null, workoutId: null } satisfies GymOverrideEntry }));
+  }, [update]);
 
   const moveGym = useCallback((
     fromDate: string,
@@ -38,7 +23,7 @@ export function useGymSchedule() {
     workoutId: string,
     existingTarget?: { gym: string; workoutId: string } | null,
   ) => {
-    setGymOverrides((prev) => {
+    update((prev) => {
       const next = { ...prev };
       // Remove (or swap back) source
       if (existingTarget) {
@@ -47,10 +32,9 @@ export function useGymSchedule() {
         next[fromDate] = { gym: null, workoutId: null };
       }
       next[toDate] = { gym, workoutId };
-      storage.set(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
-  }, []);
+  }, [update]);
 
   return { gymOverrides, setGymOnDay, removeGymFromDay, moveGym };
 }

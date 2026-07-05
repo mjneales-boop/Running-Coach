@@ -12,10 +12,10 @@ import type { TabKey } from './components/ui/TabBar';
 import { useCurrentDate } from './hooks/useCurrentDate';
 import { CompletionProvider, useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
-import { useSwaps } from './hooks/useSwaps';
+import { SwapsProvider, useSwaps } from './hooks/useSwaps';
 import { useStrength } from './hooks/useStrength';
 import { useStorage } from './hooks/useStorage';
-import { useGymSchedule } from './hooks/useGymSchedule';
+import { GymScheduleProvider, useGymSchedule } from './hooks/useGymSchedule';
 import { useExerciseOverrides } from './hooks/useExerciseOverrides';
 import { usePlan, WEEKS } from './hooks/usePlan';
 import { applySwapsToWeek, applyGymOverrides } from './lib/logic';
@@ -29,7 +29,11 @@ interface SessionModalTarget {
 export default function App() {
   return (
     <CompletionProvider>
-      <AppShell />
+      <SwapsProvider>
+        <GymScheduleProvider>
+          <AppShell />
+        </GymScheduleProvider>
+      </SwapsProvider>
     </CompletionProvider>
   );
 }

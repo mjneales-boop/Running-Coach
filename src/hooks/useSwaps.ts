@@ -1,20 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
-import storage from '../lib/storage';
+import { useCallback } from 'react';
+import { createSyncedBlob } from './createSyncedBlob';
 import type { DayAbbr, SwapStore, WeekContentMap } from '../types';
 
-export function useSwaps() {
-  const [swaps, setSwaps] = useState<SwapStore>({});
+const { Provider: SwapsProvider, useSyncedBlob: useSwapsBlob } = createSyncedBlob<SwapStore>('swaps', {});
+export { SwapsProvider };
 
-  useEffect(() => {
-    storage.get('marathon-swaps').then((result) => {
-      if (result?.value) {
-        try { setSwaps(JSON.parse(result.value) as SwapStore); } catch {}
-      }
-    });
-  }, []);
+export function useSwaps() {
+  const { value: swaps, update } = useSwapsBlob();
 
   const swapDays = useCallback((weekId: string, dayA: DayAbbr, dayB: DayAbbr) => {
-    setSwaps((prev) => {
+    update((prev) => {
       const weekMap: WeekContentMap = { ...(prev[weekId] ?? {}) };
       const srcA = weekMap[dayA] ?? dayA;
       const srcB = weekMap[dayB] ?? dayB;
@@ -24,11 +19,9 @@ export function useSwaps() {
       if (srcB === dayA) delete next[dayA]; else next[dayA] = srcB;
       if (srcA === dayB) delete next[dayB]; else next[dayB] = srcA;
 
-      const result = { ...prev, [weekId]: next };
-      storage.set('marathon-swaps', JSON.stringify(result));
-      return result;
+      return { ...prev, [weekId]: next };
     });
-  }, []);
+  }, [update]);
 
   return { swaps, swapDays };
 }
