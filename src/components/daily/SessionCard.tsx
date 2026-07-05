@@ -55,8 +55,8 @@ export function SessionCard(props: SessionCardProps) {
           <p className="max-w-[40ch] text-[15.5px] leading-normal text-[#D3DAE1]">{restDayNote()}</p>
         </div>
         <div className="flex gap-3">
-          <Button variant={done ? 'ghost' : 'primary'} className="flex-1" onClick={onComplete}>
-            {done ? '✓ Completed — Undo' : 'Complete'}
+          <Button variant={done ? 'success' : 'primary'} className="flex-1" onClick={onComplete}>
+            {done ? '✓ Completed' : 'Complete'}
           </Button>
           <Button variant="ghost" className="flex-1" onClick={onDetails}>
             Details
@@ -101,8 +101,8 @@ export function SessionCard(props: SessionCardProps) {
         <p className="max-w-[40ch] text-[15.5px] leading-normal text-[#D3DAE1]">{runDayNote(day)}</p>
       </div>
       <div className="flex gap-3">
-        <Button variant={done ? 'ghost' : 'primary'} className="flex-1" onClick={onStart}>
-          {done ? '✓ Completed — Undo' : 'Start run'}
+        <Button variant={done ? 'success' : 'primary'} className="flex-1" onClick={onStart}>
+          {done ? '✓ Completed' : 'Start run'}
         </Button>
         <Button variant="ghost" className="flex-1" onClick={onDetails}>
           Details

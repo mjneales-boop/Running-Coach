@@ -5,7 +5,10 @@ interface ScreenHeaderProps {
 
 export function ScreenHeader({ onAvatarClick, initials = 'MX' }: ScreenHeaderProps) {
   return (
-    <div className="flex items-center justify-between py-0.5 pb-5">
+    <div
+      className="flex items-center justify-between pb-5"
+      style={{ paddingTop: 'calc(2px + env(safe-area-inset-top))' }}
+    >
       <div
         className="font-display text-[19px] font-black tracking-[0.34em]"
         style={{ fontVariationSettings: "'wdth' 118" }}
@@ -28,7 +31,10 @@ interface SettingsHeaderProps {
 
 export function SettingsHeader({ onBack }: SettingsHeaderProps) {
   return (
-    <div className="flex items-center gap-3.5 pb-[18px] pt-0.5">
+    <div
+      className="flex items-center gap-3.5 pb-[18px]"
+      style={{ paddingTop: 'calc(2px + env(safe-area-inset-top))' }}
+    >
       <button
         onClick={onBack}
         className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full border border-hairline-strong"

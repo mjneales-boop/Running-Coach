@@ -8,8 +8,9 @@ import { usePlan } from '../hooks/usePlan';
 import { useCompletion } from '../hooks/useCompletion';
 import { useReadiness } from '../hooks/useReadiness';
 import { useCoachMessages } from '../hooks/useCoachMessages';
+import { useStorage } from '../hooks/useStorage';
 import { buildCoachContext, coachGreeting } from '../lib/coachContext';
-import type { CoachMessage } from '../types';
+import type { CoachMessage, StravaActivity } from '../types';
 
 const QUICK_PROMPTS = ["Pace Saturday's long run?", 'Swap Tuesday?', 'How did my last run look?'];
 
@@ -24,6 +25,7 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
   const { completion } = useCompletion();
   const { latestEntry } = useReadiness();
   const { messages, setMessages } = useCoachMessages();
+  const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -37,7 +39,7 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
   async function send(history: CoachMessage[]) {
     setThinking(true);
     try {
-      const context = buildCoachContext(today, completion, latestEntry);
+      const context = buildCoachContext(today, completion, latestEntry, stravaActivities);
       const r = await fetch('/api/coach-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,7 +69,10 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-canvas">
-      <div className="stride-rise border-b border-hairline px-[22px] pb-4 pt-2">
+      <div
+        className="stride-rise border-b border-hairline px-[22px] pb-4"
+        style={{ paddingTop: 'calc(8px + env(safe-area-inset-top))' }}
+      >
         <div className="font-mono text-[11px] font-medium uppercase tracking-[0.24em] text-muted">
           In context · wk {currentWeek.num} {currentPhase.short.toLowerCase()}
         </div>

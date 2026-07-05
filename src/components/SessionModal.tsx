@@ -292,8 +292,8 @@ export function SessionModal({
             </div>
           )}
 
-          <Button variant="primary" className="w-full" onClick={() => onToggleDone(weekId, dayAbbr)}>
-            {entry.done ? '✓ Completed — Undo' : 'Mark complete'}
+          <Button variant={entry.done ? 'success' : 'primary'} className="w-full" onClick={() => onToggleDone(weekId, dayAbbr)}>
+            {entry.done ? '✓ Completed — tap to undo' : 'Mark complete'}
           </Button>
         </>
       )}

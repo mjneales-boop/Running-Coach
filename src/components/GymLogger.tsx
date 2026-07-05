@@ -103,6 +103,9 @@ function SetRow({
         {lastLabel && !setLog?.weight && (
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', opacity: 0.6 }}>{lastLabel}</span>
         )}
+        {setLog?.weight != null && (
+          <span style={{ color: 'var(--success)', fontSize: 14 }}>✓</span>
+        )}
       </div>
     );
   }
@@ -123,6 +126,9 @@ function SetRow({
           onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; handleChange(); }}
         />
         <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>reps</span>
+        {setLog?.reps != null && (
+          <span style={{ color: 'var(--success)', fontSize: 14 }}>✓</span>
+        )}
       </div>
     );
   }
@@ -136,7 +142,7 @@ function SetRow({
             type="checkbox"
             checked={setLog?.done ?? false}
             onChange={(e) => onUpdate(setIndex, { done: e.target.checked })}
-            style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
+            style={{ accentColor: 'var(--success)', width: 16, height: 16 }}
           />
           <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>{exercise.reps}</span>
         </label>
@@ -404,7 +410,7 @@ export function GymLogger({
                     type="checkbox"
                     checked={exerciseSets[0]?.done ?? false}
                     onChange={(e) => handleUpdate(exercise.id, 0, { done: e.target.checked })}
-                    style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
+                    style={{ accentColor: 'var(--success)', width: 16, height: 16 }}
                   />
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>done</span>
                 </label>
@@ -466,7 +472,7 @@ export function GymLogger({
                         type="checkbox"
                         checked={exerciseSets[0]?.done ?? false}
                         onChange={(e) => handleUpdate(exercise.id, 0, { done: e.target.checked })}
-                        style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
+                        style={{ accentColor: 'var(--success)', width: 16, height: 16 }}
                       />
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>done</span>
                     </label>

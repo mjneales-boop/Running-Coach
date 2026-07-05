@@ -2,7 +2,7 @@ import type { MouseEventHandler, ReactNode } from 'react';
 
 interface ButtonProps {
   children: ReactNode;
-  variant?: 'primary' | 'ghost';
+  variant?: 'primary' | 'ghost' | 'success';
   onClick?: MouseEventHandler<HTMLButtonElement>;
   className?: string;
   disabled?: boolean;
@@ -20,7 +20,9 @@ export function Button({
   const styles =
     variant === 'primary'
       ? 'bg-accent text-accent-ink'
-      : 'border border-hairline-strong text-ink';
+      : variant === 'success'
+        ? 'bg-success text-canvas'
+        : 'border border-hairline-strong text-ink';
 
   return (
     <button
