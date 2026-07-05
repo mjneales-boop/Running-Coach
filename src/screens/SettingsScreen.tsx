@@ -56,40 +56,71 @@ function SettingsRow({ label, value, onClick }: { label: string; value: ReactNod
   );
 }
 
+function timeAgo(date: Date): string {
+  const mins = Math.round((Date.now() - date.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 function ConnectionRow({
   icon,
   name,
   subtitle,
   connected,
   onToggle,
+  onSync,
+  syncing,
+  lastSynced,
 }: {
   icon: ReactNode;
   name: string;
   subtitle: string;
   connected: boolean | null;
   onToggle: () => void;
+  onSync?: () => void;
+  syncing?: boolean;
+  lastSynced?: Date | null;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-hairline py-[17px] first:border-t-0">
-      <div className="flex min-w-0 items-center gap-3.5">
-        <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] border border-hairline bg-field">
-          {icon}
+    <div className="border-t border-hairline py-[17px] first:border-t-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] border border-hairline bg-field">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[15.5px] font-semibold">{name}</div>
+            <div className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted">{subtitle}</div>
+          </div>
         </div>
-        <div className="min-w-0">
-          <div className="text-[15.5px] font-semibold">{name}</div>
-          <div className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted">{subtitle}</div>
-        </div>
+        <button
+          onClick={onToggle}
+          className={`flex-none whitespace-nowrap rounded-[9px] px-[15px] py-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] transition-colors ${
+            connected
+              ? 'border border-[rgba(0,217,255,0.4)] bg-accent-tint text-accent'
+              : 'border border-hairline-strong text-ink'
+          }`}
+        >
+          {connected ? 'Connected' : 'Connect'}
+        </button>
       </div>
-      <button
-        onClick={onToggle}
-        className={`flex-none whitespace-nowrap rounded-[9px] px-[15px] py-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] transition-colors ${
-          connected
-            ? 'border border-[rgba(0,217,255,0.4)] bg-accent-tint text-accent'
-            : 'border border-hairline-strong text-ink'
-        }`}
-      >
-        {connected ? 'Connected' : 'Connect'}
-      </button>
+      {connected && onSync && (
+        <div className="mt-3 flex items-center justify-between pl-[54px]">
+          <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
+            {syncing ? 'Syncing…' : lastSynced ? `Synced ${timeAgo(lastSynced)}` : 'Not yet synced'}
+          </span>
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-accent disabled:opacity-40"
+          >
+            Sync now
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -133,6 +164,9 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           subtitle="Runs & activities"
           connected={strava.connected}
           onToggle={strava.connected ? strava.disconnect : strava.connect}
+          onSync={strava.connected ? () => strava.sync(90) : undefined}
+          syncing={strava.syncing}
+          lastSynced={strava.lastSynced}
           icon={
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth={1.9}>
               <path d="M4 13h4l2.5-7 4 14L18 13h2" strokeLinecap="round" strokeLinejoin="round" />
@@ -144,6 +178,9 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           subtitle="Readiness & sleep"
           connected={oura.connected}
           onToggle={oura.connected ? oura.disconnect : oura.connect}
+          onSync={oura.connected ? () => oura.sync(30) : undefined}
+          syncing={oura.syncing}
+          lastSynced={oura.lastSynced}
           icon={
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth={1.9}>
               <circle cx="12" cy="12" r="7" />

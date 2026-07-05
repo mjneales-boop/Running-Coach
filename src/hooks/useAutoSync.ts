@@ -22,9 +22,14 @@ export function useAutoSync(oura: SyncSource, strava: SyncSource) {
 
   useEffect(() => {
     if (strava.connected === true) {
+      // First sync ever on this device pulls the full plan-to-date window (up to
+      // Strava's 90-day cap) so weekly volume/pace history isn't stuck at "just today's
+      // run" after connecting. Later auto-syncs only need a narrow catch-up window —
+      // anything already fetched stays merged into the local cache regardless.
+      const isFirstSync = !strava.lastSynced;
       const fifteenMinAgo = Date.now() - 15 * 60 * 1000;
-      if (!strava.lastSynced || strava.lastSynced.getTime() < fifteenMinAgo) {
-        strava.sync(7).catch(() => {});
+      if (isFirstSync || strava.lastSynced!.getTime() < fifteenMinAgo) {
+        strava.sync(isFirstSync ? 90 : 7).catch(() => {});
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
