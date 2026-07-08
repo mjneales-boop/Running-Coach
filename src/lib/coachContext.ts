@@ -1,5 +1,15 @@
 import { WEEKS, ZONES, RACE_NAME, RACE_DATE, GOAL_TIME, GOAL_PACE, ATHLETE, SEED_READINESS } from '../constants/plan';
-import { findCurrentWeek, findTodaySession, daysToRace, currentPhase, weeklyKmDone, readinessHeadline, readinessAdjustment } from './logic';
+import {
+  findCurrentWeek,
+  findCurrentWeekIndex,
+  findTodaySession,
+  daysToRace,
+  currentPhase,
+  weeklyKmDone,
+  readinessHeadline,
+  readinessAdjustment,
+  buildProgressStats,
+} from './logic';
 import { guideEntriesForDay } from './coaching';
 import type { CompletionEntry, Day, ReadinessEntry, StravaActivity, Week } from '../types';
 
@@ -54,6 +64,8 @@ export interface CoachContext {
   upcoming: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string; guide?: GuideSummary[] }[];
   /** Actual logged runs from Strava, most recent first — real pace/HR/distance, not just the plan. */
   recentRuns: { date: string; distanceKm: number; avgPaceMinKm: number; avgHR?: number }[];
+  /** Completed km per week for the last few weeks (oldest first) plus this week — use for volume-trend questions ("how has my training been going the last few weeks"). */
+  recentWeeks: { label: string; kmDone: number; targetKm: number }[];
   stravaConnected: boolean;
 }
 
@@ -84,11 +96,17 @@ export function buildCoachContext(
   stravaActivities: Record<string, StravaActivity> = {},
 ): CoachContext {
   const week = findCurrentWeek(today, WEEKS);
+  const weekIndex = findCurrentWeekIndex(today, WEEKS);
   const phase = currentPhase(week);
   const todaySession = findTodaySession(today, week);
   const r = readinessEntry.score != null ? readinessEntry : SEED_READINESS;
   const { headline } = readinessHeadline(r.score);
   const activities = Object.values(stravaActivities).sort((a, b) => b.date.localeCompare(a.date));
+  const progress = buildProgressStats(WEEKS, completion, weekIndex);
+  const recentWeeks = progress.volume
+    .filter((v) => !v.isPlanned)
+    .slice(-4)
+    .map((v) => ({ label: v.label, kmDone: v.km, targetKm: WEEKS.find((w) => w.id === v.weekId)!.targetKm }));
 
   return {
     race: { name: RACE_NAME, date: RACE_DATE, goalTime: GOAL_TIME, goalPace: GOAL_PACE },
@@ -122,6 +140,7 @@ export function buildCoachContext(
       avgPaceMinKm: a.avgPaceMinKm,
       avgHR: a.avgHR,
     })),
+    recentWeeks,
     stravaConnected: activities.length > 0,
   };
 }

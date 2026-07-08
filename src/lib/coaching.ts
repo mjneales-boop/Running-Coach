@@ -27,7 +27,8 @@ export function guideEntriesForDay(day: Day): GuideEntry[] {
       break;
     case 'WORKOUT': {
       const text = day.title + ' ' + (day.notes ?? '');
-      if (/4:55|threshold|\bT\b/i.test(text)) entries.push(SESSION_GUIDE.threshold);
+      if (/steady/i.test(text)) entries.push(SESSION_GUIDE.steady);
+      else if (/4:55|threshold|\bT\b/i.test(text)) entries.push(SESSION_GUIDE.threshold);
       else if (/5:10|sub-?t/i.test(text)) entries.push(SESSION_GUIDE.subThreshold);
       else if (/CV|4:2[5-9]|4:3[0-5]/i.test(text)) entries.push(SESSION_GUIDE.vo2);
       else entries.push(SESSION_GUIDE.subThreshold);
