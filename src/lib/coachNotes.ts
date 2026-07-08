@@ -29,3 +29,12 @@ export const SESSION_TYPE_LABEL: Record<SessionType, string> = {
   REST: 'Rest',
   RACE: 'Race day',
 };
+
+export const ACTION_LABEL: Record<SessionType, string> = {
+  LONG: 'Mark run done',
+  WORKOUT: 'Mark run done',
+  EASY: 'Mark run done',
+  RACE: 'Mark run done',
+  BIKE: 'Mark bike done',
+  REST: 'Complete',
+};

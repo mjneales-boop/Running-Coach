@@ -5,7 +5,7 @@ import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { ExerciseAccordion } from '../components/strength/ExerciseAccordion';
 import { RecentHistoryList } from '../components/strength/RecentHistoryList';
 import { useCurrentDate } from '../hooks/useCurrentDate';
-import { usePlan } from '../hooks/usePlan';
+import { usePlan, WEEKS } from '../hooks/usePlan';
 import { useSwaps } from '../hooks/useSwaps';
 import { useGymSchedule } from '../hooks/useGymSchedule';
 import { useExerciseOverrides } from '../hooks/useExerciseOverrides';
@@ -14,7 +14,7 @@ import { WORKOUTS } from '../constants/workouts';
 import { getSessionExercises } from '../lib/exercises';
 import { allTimePR, recentLogsSummary } from '../lib/strength';
 import { applySwapsToWeek, applyGymOverrides, nextGymDay } from '../lib/logic';
-import type { SetLog } from '../types';
+import type { DayAbbr, SetLog } from '../types';
 
 function localDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -24,9 +24,10 @@ interface StrengthScreenProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   onOpenSettings: () => void;
+  focusDay?: { weekId: string; dayAbbr: DayAbbr } | null;
 }
 
-export function StrengthScreen({ activeTab, onTabChange, onOpenSettings }: StrengthScreenProps) {
+export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDay }: StrengthScreenProps) {
   const today = useCurrentDate();
   const { currentWeek: rawCurrentWeek } = usePlan(today, 0);
   const { swaps } = useSwaps();
@@ -38,8 +39,16 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings }: Stren
     () => applyGymOverrides(applySwapsToWeek(rawCurrentWeek, swaps[rawCurrentWeek.id] ?? {}), gymOverrides),
     [rawCurrentWeek, swaps, gymOverrides],
   );
+  const focusWeek = useMemo(() => {
+    if (!focusDay) return null;
+    const raw = WEEKS.find((w) => w.id === focusDay.weekId);
+    if (!raw) return null;
+    return applyGymOverrides(applySwapsToWeek(raw, swaps[focusDay.weekId] ?? {}), gymOverrides);
+  }, [focusDay, swaps, gymOverrides]);
   const todayStr = localDateKey(today);
-  const gymDay = nextGymDay(today, currentWeek);
+  const gymDay = focusDay
+    ? focusWeek?.days.find((d) => d.d === focusDay.dayAbbr)
+    : nextGymDay(today, currentWeek);
   const isToday = gymDay?.date === todayStr;
   const date = gymDay?.date ?? todayStr;
   const workoutId = gymDay?.workoutId;

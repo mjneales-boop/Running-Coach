@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { UiKitDemo } from './screens/UiKitDemo';
 import { DailyScreen } from './screens/DailyScreen';
 import { StrengthScreen } from './screens/StrengthScreen';
@@ -13,10 +13,11 @@ import { useCurrentDate } from './hooks/useCurrentDate';
 import { CompletionProvider, useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
 import { SwapsProvider, useSwaps } from './hooks/useSwaps';
-import { useStrength } from './hooks/useStrength';
 import { useStorage } from './hooks/useStorage';
 import { GymScheduleProvider, useGymSchedule } from './hooks/useGymSchedule';
-import { useExerciseOverrides } from './hooks/useExerciseOverrides';
+import { OuraProvider, useOura } from './hooks/useOura';
+import { StravaProvider, useStrava } from './hooks/useStrava';
+import { useAutoSync } from './hooks/useAutoSync';
 import { usePlan, WEEKS } from './hooks/usePlan';
 import { applySwapsToWeek, applyGymOverrides } from './lib/logic';
 import type { DayAbbr, StravaActivity } from './types';
@@ -31,7 +32,11 @@ export default function App() {
     <CompletionProvider>
       <SwapsProvider>
         <GymScheduleProvider>
-          <AppShell />
+          <OuraProvider>
+            <StravaProvider>
+              <AppShell />
+            </StravaProvider>
+          </OuraProvider>
         </GymScheduleProvider>
       </SwapsProvider>
     </CompletionProvider>
@@ -45,15 +50,17 @@ function AppShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessionModal, setSessionModal] = useState<SessionModalTarget | null>(null);
   const [readinessModalOpen, setReadinessModalOpen] = useState(false);
+  const [strengthFocus, setStrengthFocus] = useState<SessionModalTarget | null>(null);
 
   const { currentWeek, todaySession } = usePlan(today, 0);
   const { completion, toggleDone, setNotes } = useCompletion();
   const { latestEntry, logEntry } = useReadiness();
   const { swaps, swapDays } = useSwaps();
   const { gymOverrides, setGymOnDay, removeGymFromDay } = useGymSchedule();
-  const { exerciseOverrides, setSessionExercises } = useExerciseOverrides();
-  const { strength, logSet, markComplete: markStrengthComplete } = useStrength();
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
+  const oura = useOura();
+  const strava = useStrava();
+  useAutoSync(oura, strava);
 
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -68,6 +75,16 @@ function AppShell() {
       toggleDone(currentWeek.id, todaySession.d);
     }
   };
+
+  const navigateToStrength = (weekId: string, dayAbbr: DayAbbr) => {
+    setStrengthFocus({ weekId, dayAbbr });
+    setTab('strength');
+    setSessionModal(null);
+  };
+
+  useEffect(() => {
+    if (tab !== 'strength') setStrengthFocus(null);
+  }, [tab]);
 
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('uikit')) {
     return <UiKitDemo />;
@@ -89,7 +106,12 @@ function AppShell() {
             />
           )}
           {tab === 'strength' && (
-            <StrengthScreen activeTab={tab} onTabChange={setTab} onOpenSettings={() => setSettingsOpen(true)} />
+            <StrengthScreen
+              activeTab={tab}
+              onTabChange={setTab}
+              onOpenSettings={() => setSettingsOpen(true)}
+              focusDay={strengthFocus}
+            />
           )}
           {tab === 'progress' && (
             <ProgressScreen activeTab={tab} onTabChange={setTab} onOpenSettings={() => setSettingsOpen(true)} />
@@ -125,14 +147,10 @@ function AppShell() {
               onClose={() => setSessionModal(null)}
               swapMap={swaps[sessionModal.weekId] ?? {}}
               onSwapDay={(a, b) => swapDays(sessionModal.weekId, a, b)}
-              strength={strength}
-              onLogSet={logSet}
-              onMarkStrengthComplete={markStrengthComplete}
               stravaActivities={stravaActivities}
               onAddGym={setGymOnDay}
               onRemoveGym={removeGymFromDay}
-              exerciseOverrides={exerciseOverrides}
-              onSetSessionExercises={setSessionExercises}
+              onNavigateToStrength={navigateToStrength}
             />
           );
         })()}

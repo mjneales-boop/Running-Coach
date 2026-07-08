@@ -1,12 +1,13 @@
 import { Tag } from '../ui/Tag';
 import { Button } from '../ui/Button';
-import { restDayNote, runDayNote, SESSION_TYPE_LABEL } from '../../lib/coachNotes';
+import { restDayNote, runDayNote, SESSION_TYPE_LABEL, ACTION_LABEL } from '../../lib/coachNotes';
 import { zoneForPace, estimateDuration } from '../../lib/logic';
 import type { Day } from '../../types';
 
 interface SessionCardRestProps {
   variant: 'rest';
   weekMeta: string;
+  gym?: string;
   done: boolean;
   onComplete: () => void;
   onDetails: () => void;
@@ -37,7 +38,8 @@ export function StatBlock({ label, value, unit, isFirst }: { label: string; valu
 
 export function SessionCard(props: SessionCardProps) {
   if (props.variant === 'rest') {
-    const { weekMeta, done, onComplete, onDetails } = props;
+    const { weekMeta, gym, done, onComplete, onDetails } = props;
+    const actionLabel = gym ? 'Mark lift done' : ACTION_LABEL.REST;
     return (
       <div className="stride-rise mb-[26px] rounded-[18px] border border-hairline bg-surface p-[22px]">
         <div className="mb-1.5 flex items-center justify-between">
@@ -56,7 +58,7 @@ export function SessionCard(props: SessionCardProps) {
         </div>
         <div className="flex gap-3">
           <Button variant={done ? 'success' : 'primary'} className="flex-1" onClick={onComplete}>
-            {done ? '✓ Completed' : 'Complete'}
+            {done ? '✓ Completed' : actionLabel}
           </Button>
           <Button variant="ghost" className="flex-1" onClick={onDetails}>
             Details
@@ -102,7 +104,7 @@ export function SessionCard(props: SessionCardProps) {
       </div>
       <div className="flex gap-3">
         <Button variant={done ? 'success' : 'primary'} className="flex-1" onClick={onStart}>
-          {done ? '✓ Completed' : 'Start run'}
+          {done ? '✓ Completed' : ACTION_LABEL[day.type]}
         </Button>
         <Button variant="ghost" className="flex-1" onClick={onDetails}>
           Details

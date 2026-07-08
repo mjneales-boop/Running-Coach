@@ -1,6 +1,27 @@
 import { WEEKS, ZONES, RACE_NAME, RACE_DATE, GOAL_TIME, GOAL_PACE, ATHLETE, SEED_READINESS } from '../constants/plan';
-import { findCurrentWeek, findTodaySession, daysToRace, currentPhase, weeklyKmDone, readinessHeadline } from './logic';
-import type { CompletionEntry, ReadinessEntry, StravaActivity, Week } from '../types';
+import { findCurrentWeek, findTodaySession, daysToRace, currentPhase, weeklyKmDone, readinessHeadline, readinessAdjustment } from './logic';
+import { guideEntriesForDay } from './coaching';
+import type { CompletionEntry, Day, ReadinessEntry, StravaActivity, Week } from '../types';
+
+interface GuideSummary {
+  label: string;
+  what: string;
+  why: string;
+  feel: string;
+  execute: string[];
+  mistake: string;
+}
+
+function guideSummary(day: Day): GuideSummary[] {
+  return guideEntriesForDay(day).map(({ label, what, why, feel, execute, mistake }) => ({
+    label,
+    what,
+    why,
+    feel,
+    execute,
+    mistake,
+  }));
+}
 
 export interface CoachContext {
   race: { name: string; date: string; goalTime: string; goalPace: string };
@@ -16,9 +37,21 @@ export interface CoachContext {
     baselineSleep: number;
   };
   zones: { name: string; pace: string; hr: string }[];
-  today: { type: string; title: string; km?: number; pace?: string; notes?: string } | null;
-  /** Today plus the next ~9 days of the plan, spanning into next week if needed — lets the coach answer "what's tomorrow / this weekend / next week" questions. */
-  upcoming: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string }[];
+  today:
+    | {
+        type: string;
+        title: string;
+        km?: number;
+        pace?: string;
+        notes?: string;
+        /** What/why/feel/execution-steps/common-mistake for today's session type — use this for detailed breakdown questions. */
+        guide?: GuideSummary[];
+        /** How today's session should be adjusted given current readiness. */
+        readinessAdjustment?: string;
+      }
+    | null;
+  /** Today plus the next ~9 days of the plan, spanning into next week if needed — lets the coach answer "what's tomorrow / this weekend / next week" questions. Only the near-term entries (first ~4) carry full `guide` detail, to bound context size. */
+  upcoming: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string; guide?: GuideSummary[] }[];
   /** Actual logged runs from Strava, most recent first — real pace/HR/distance, not just the plan. */
   recentRuns: { date: string; distanceKm: number; avgPaceMinKm: number; avgHR?: number }[];
   stravaConnected: boolean;
@@ -28,12 +61,20 @@ function weekdayShort(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-function upcomingDays(today: Date, count = 10) {
+function upcomingDays(today: Date, count = 10, guideDepth = 4) {
   const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   return WEEKS.flatMap((w) => w.days)
     .filter((d) => d.date >= t)
     .slice(0, count)
-    .map((d) => ({ date: d.date, weekday: weekdayShort(d.date), type: d.type, title: d.title, km: d.km, pace: d.pace }));
+    .map((d, i) => ({
+      date: d.date,
+      weekday: weekdayShort(d.date),
+      type: d.type,
+      title: d.title,
+      km: d.km,
+      pace: d.pace,
+      ...(i < guideDepth ? { guide: guideSummary(d) } : {}),
+    }));
 }
 
 export function buildCoachContext(
@@ -64,7 +105,15 @@ export function buildCoachContext(
     },
     zones: ZONES.map((z) => ({ name: z.name, pace: z.pace, hr: z.hr })),
     today: todaySession
-      ? { type: todaySession.type, title: todaySession.title, km: todaySession.km, pace: todaySession.pace, notes: todaySession.notes }
+      ? {
+          type: todaySession.type,
+          title: todaySession.title,
+          km: todaySession.km,
+          pace: todaySession.pace,
+          notes: todaySession.notes,
+          guide: guideSummary(todaySession),
+          readinessAdjustment: readinessAdjustment(r.score),
+        }
       : null,
     upcoming: upcomingDays(today),
     recentRuns: activities.slice(0, 10).map((a) => ({

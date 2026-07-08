@@ -3,12 +3,12 @@ import { Sheet } from './ui/Sheet';
 import { Tag } from './ui/Tag';
 import { Button } from './ui/Button';
 import { StatBlock } from './daily/SessionCard';
-import { GymLogger } from './GymLogger';
+import { StrengthLinkCard } from './daily/StrengthLinkCard';
 import { guideEntriesForDay } from '../lib/coaching';
 import { estimateDuration, zoneForPace } from '../lib/logic';
 import { SESSION_TYPE_LABEL } from '../lib/coachNotes';
 import { WORKOUTS } from '../constants/workouts';
-import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, SetLog, WorkoutLog, StravaActivity, SessionExerciseOverrides } from '../types';
+import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, StravaActivity } from '../types';
 
 const GYM_OPTIONS = Object.values(WORKOUTS).map((w) => ({ id: w.id, name: w.name }));
 
@@ -22,14 +22,10 @@ interface SessionModalProps {
   onClose: () => void;
   swapMap: WeekContentMap;
   onSwapDay: (dayA: DayAbbr, dayB: DayAbbr) => void;
-  strength: Record<string, WorkoutLog>;
-  onLogSet: (date: string, workoutId: string, exerciseId: string, setIndex: number, setLog: SetLog) => Promise<void>;
-  onMarkStrengthComplete: (date: string, workoutId: string) => Promise<void>;
   stravaActivities?: Record<string, StravaActivity>;
   onAddGym: (date: string, gym: string, workoutId: string) => void;
   onRemoveGym: (date: string) => void;
-  exerciseOverrides: SessionExerciseOverrides;
-  onSetSessionExercises: (date: string, workoutId: string, exerciseIds: string[]) => void;
+  onNavigateToStrength: (weekId: string, dayAbbr: DayAbbr) => void;
 }
 
 export function SessionModal({
@@ -42,14 +38,10 @@ export function SessionModal({
   onClose,
   swapMap,
   onSwapDay,
-  strength,
-  onLogSet,
-  onMarkStrengthComplete,
   stravaActivities,
   onAddGym,
   onRemoveGym,
-  exerciseOverrides,
-  onSetSessionExercises,
+  onNavigateToStrength,
 }: SessionModalProps) {
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
@@ -58,9 +50,6 @@ export function SessionModal({
 
   const hasCardio = day ? ['LONG', 'WORKOUT', 'EASY', 'BIKE'].includes(day.type) : false;
   const hasGym = !!day?.workoutId;
-  const showTabs = hasCardio && hasGym;
-  const runLabel = day?.type === 'BIKE' ? 'bike' : 'run';
-  const [activeTab, setActiveTab] = useState<'run' | 'gym'>('run');
   const [showAddGymPicker, setShowAddGymPicker] = useState(false);
 
   useEffect(() => {
@@ -95,27 +84,7 @@ export function SessionModal({
         </div>
       }
     >
-      {showTabs && (
-        <div className="mb-5 flex gap-6 border-b border-hairline">
-          {([runLabel, 'gym'] as const).map((tab) => {
-            const isActive = tab === runLabel ? activeTab === 'run' : activeTab === 'gym';
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab === runLabel ? 'run' : 'gym')}
-                className={`-mb-px border-b-2 pb-3 font-display text-[13px] font-bold uppercase tracking-[0.04em] ${
-                  isActive ? 'border-accent text-accent' : 'border-transparent text-muted'
-                }`}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {(!showTabs || activeTab === 'run') && (
-        <>
+      <>
           <h1
             className="mb-4 font-display text-[42px] font-extrabold uppercase leading-[0.92] tracking-[-0.01em]"
             style={{ fontVariationSettings: "'wdth' 110" }}
@@ -286,6 +255,16 @@ export function SessionModal({
             </div>
           </div>
 
+          {hasGym && (
+            <div className="mb-6">
+              <StrengthLinkCard
+                gymName={day.gym ?? 'Strength'}
+                dayLabel={dateLabel}
+                onClick={() => onNavigateToStrength(weekId, dayAbbr)}
+              />
+            </div>
+          )}
+
           {entry.done && entry.completedAt && (
             <div className="mb-4 font-mono text-xs text-success">
               ✓ Completed {new Date(entry.completedAt).toLocaleString()}
@@ -296,31 +275,6 @@ export function SessionModal({
             {entry.done ? '✓ Completed — tap to undo' : 'Mark complete'}
           </Button>
         </>
-      )}
-
-      {showTabs && activeTab === 'gym' && (
-        <>
-          <GymLogger
-            day={day}
-            weekId={weekId}
-            strength={strength}
-            onLogSet={onLogSet}
-            onMarkComplete={onMarkStrengthComplete}
-            onToggleDone={onToggleDone}
-            completion={completion}
-            exerciseOverrides={exerciseOverrides}
-            onSetSessionExercises={onSetSessionExercises}
-          />
-          <div className="mt-4 border-t border-hairline pt-4">
-            <button
-              onClick={() => { onRemoveGym(day.date); onClose(); }}
-              className="rounded-lg border border-hairline px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.05em] text-muted"
-            >
-              Remove gym from this day
-            </button>
-          </div>
-        </>
-      )}
     </Sheet>
   );
 }

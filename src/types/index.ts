@@ -101,6 +101,28 @@ export interface StravaActivity {
   avgHR?: number;
 }
 
+export interface StravaSplit {
+  split: number;         // 1-indexed
+  distanceM: number;     // ~1000, final split may be a partial distance
+  avgPaceMinKm: number;  // decimal minutes per km
+  avgHR?: number;
+  elevationDiffM?: number;
+}
+
+export interface StravaRunDetail {
+  id: string;
+  name: string;
+  date: string;          // YYYY-MM-DD
+  distanceKm: number;
+  avgPaceMinKm: number;
+  avgHR?: number;
+  maxHR?: number;
+  elevationGainM: number;
+  polyline?: string;      // decimated (summary) encoded polyline — thumbnail
+  fullPolyline?: string;  // full-resolution encoded polyline — expanded map
+  splits: StravaSplit[];
+}
+
 export interface CoachMessage {
   role: 'user' | 'assistant';
   content: string;

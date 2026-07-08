@@ -4,6 +4,7 @@ import { SessionCard } from '../components/daily/SessionCard';
 import { ReadinessCard } from '../components/daily/ReadinessCard';
 import { WeekProgressCard } from '../components/daily/WeekProgressCard';
 import { StrengthLinkCard } from '../components/daily/StrengthLinkCard';
+import { LastRunCard } from '../components/daily/LastRunCard';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
@@ -13,7 +14,7 @@ import { useCompletion } from '../hooks/useCompletion';
 import { useReadiness } from '../hooks/useReadiness';
 import { useOura } from '../hooks/useOura';
 import { useStrava } from '../hooks/useStrava';
-import { useAutoSync } from '../hooks/useAutoSync';
+import { useLastRun } from '../hooks/useLastRun';
 import { useSwaps } from '../hooks/useSwaps';
 import { useGymSchedule } from '../hooks/useGymSchedule';
 import { SEED_READINESS } from '../constants/plan';
@@ -57,7 +58,7 @@ export function DailyScreen({
   const { gymOverrides } = useGymSchedule();
   const oura = useOura();
   const strava = useStrava();
-  useAutoSync(oura, strava);
+  const lastRun = useLastRun(strava.connected);
 
   const currentWeek = useMemo(
     () => applyGymOverrides(applySwapsToWeek(rawCurrentWeek, swaps[rawCurrentWeek.id] ?? {}), gymOverrides),
@@ -94,6 +95,7 @@ export function DailyScreen({
         <SessionCard
           variant="rest"
           weekMeta={`Wk ${currentWeek.num} · ${currentPhase.short.toLowerCase()}`}
+          gym={todaySession?.gym}
           done={todayDone}
           onComplete={onCompleteToday}
           onDetails={onOpenDetails}
@@ -141,6 +143,11 @@ export function DailyScreen({
         nextTitle={nextDay?.title ?? 'Rest'}
         nextKm={nextDay?.km}
       />
+
+      <div className="stride-rise mb-3.5 flex items-baseline justify-between">
+        <Eyebrow>Last run</Eyebrow>
+      </div>
+      <LastRunCard run={lastRun.run} loading={lastRun.loading} error={lastRun.error} />
 
       <div className="stride-rise mb-3.5 flex items-baseline justify-between">
         <Eyebrow>Strength</Eyebrow>

@@ -8,9 +8,11 @@ interface SyncSource {
 }
 
 /**
- * Auto-sync Oura (every mount) and Strava (throttled to 15 min) once each
- * service reports as connected. Carried over from the old ReadinessBand,
- * which owned these effects before the Daily-tab redesign retired it.
+ * Auto-sync Oura (once per app session) and Strava (throttled to 15 min) once each
+ * service reports as connected. Called once from AppShell (src/App.tsx), which stays
+ * mounted for the life of the session, so sync fires regardless of which tab is active
+ * — previously this lived in DailyScreen alone, so leaving the Daily tab killed the only
+ * sync trigger and other screens (e.g. Coach) were stuck reading whatever was last cached.
  */
 export function useAutoSync(oura: SyncSource, strava: SyncSource) {
   useEffect(() => {

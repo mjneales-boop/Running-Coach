@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
 import { useCompletion } from './useCompletion';
 import { WEEKS } from '../constants/plan';
+import { formatPaceMinKm } from '../lib/format';
 import type { StravaActivity } from '../types';
 
 type StravaMap = Record<string, StravaActivity>;
@@ -13,12 +14,23 @@ interface StravaSyncResponse {
 
 const SYNC_TS_KEY = 'marathon-strava-synced';
 
-function formatPace(avgPaceMinKm: number): string {
-  const totalSec = Math.round(avgPaceMinKm * 60);
-  return `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
+interface UseStrava {
+  connected: boolean | null;
+  syncing: boolean;
+  lastSynced: Date | null;
+  lastError: string | null;
+  sync: (days?: number) => Promise<StravaMap>;
+  connect: () => void;
+  disconnect: () => Promise<void>;
 }
 
-export function useStrava() {
+const StravaContext = createContext<UseStrava | null>(null);
+
+// Single instance lives in StravaProvider (mounted once at the app root, nested inside
+// CompletionProvider since autoComplete() writes into completion state) so every screen
+// reads the same connection/sync state — see useOura.tsx for why this matters (Daily was
+// previously the only screen that kept a sync effect alive).
+export function StravaProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(() => {
@@ -57,7 +69,7 @@ export function useStrava() {
           await setActual(week.id, day.d, {
             done: true,
             actualKm: activity.distanceKm,
-            actualPace: formatPace(activity.avgPaceMinKm),
+            actualPace: formatPaceMinKm(activity.avgPaceMinKm),
             ...(activity.avgHR != null && { actualHR: activity.avgHR }),
           });
         }
@@ -125,5 +137,12 @@ export function useStrava() {
     setLastSynced(null);
   }, []);
 
-  return { connected, syncing, lastSynced, lastError, sync, connect, disconnect };
+  const value: UseStrava = { connected, syncing, lastSynced, lastError, sync, connect, disconnect };
+  return <StravaContext.Provider value={value}>{children}</StravaContext.Provider>;
+}
+
+export function useStrava(): UseStrava {
+  const ctx = useContext(StravaContext);
+  if (!ctx) throw new Error('useStrava must be used within a StravaProvider');
+  return ctx;
 }

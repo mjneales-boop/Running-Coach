@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
 import type { ReadinessEntry } from '../types';
@@ -10,7 +10,24 @@ interface OuraSyncResponse {
   range: { start: string; end: string };
 }
 
-export function useOura() {
+interface UseOura {
+  connected: boolean | null;
+  syncing: boolean;
+  lastSynced: Date | null;
+  lastError: string | null;
+  sync: (days?: number) => Promise<ReadinessMap>;
+  connect: () => void;
+  disconnect: () => Promise<void>;
+}
+
+const OuraContext = createContext<UseOura | null>(null);
+
+// Single instance lives in OuraProvider (mounted once at the app root) so every screen
+// reads the same connection/sync state — otherwise each screen's own useOura() call held
+// an independent instance that only synced while that screen was mounted, so navigating
+// away from Daily (which owned the only sync trigger) meant Coach never saw a fresh
+// readiness score for the rest of the session.
+export function OuraProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
@@ -88,5 +105,12 @@ export function useOura() {
     setLastSynced(null);
   }, []);
 
-  return { connected, syncing, lastSynced, lastError, sync, connect, disconnect };
+  const value: UseOura = { connected, syncing, lastSynced, lastError, sync, connect, disconnect };
+  return <OuraContext.Provider value={value}>{children}</OuraContext.Provider>;
+}
+
+export function useOura(): UseOura {
+  const ctx = useContext(OuraContext);
+  if (!ctx) throw new Error('useOura must be used within an OuraProvider');
+  return ctx;
 }
