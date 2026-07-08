@@ -4,6 +4,7 @@ import { Tag } from './ui/Tag';
 import { Button } from './ui/Button';
 import { StatBlock } from './daily/SessionCard';
 import { StrengthLinkCard } from './daily/StrengthLinkCard';
+import { PaceProgressionChart } from './progress/PaceProgressionChart';
 import { guideEntriesForDay } from '../lib/coaching';
 import { estimateDuration, zoneForPace } from '../lib/logic';
 import { SESSION_TYPE_LABEL } from '../lib/coachNotes';
@@ -136,6 +137,8 @@ export function SessionModal({
               <p className="max-w-[42ch] text-[15px] leading-normal text-[#D3DAE1]">{day.notes}</p>
             </div>
           )}
+
+          {day.type === 'WORKOUT' && <PaceProgressionChart currentWeekId={weekId} />}
 
           {guides.length > 0 && (
             <div className="mb-6 flex flex-col gap-6">

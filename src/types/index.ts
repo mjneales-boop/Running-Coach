@@ -2,6 +2,8 @@ export type SessionType = 'LONG' | 'WORKOUT' | 'EASY' | 'BIKE' | 'REST' | 'RACE'
 export type Phase = 0 | 1 | 2 | 3 | 4;
 export type DayAbbr = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
+export type WorkoutPaceCategory = 'intro' | 'subThreshold' | 'threshold' | 'marathonPace';
+
 export interface Day {
   d: DayAbbr;
   date: string;
@@ -14,6 +16,7 @@ export interface Day {
   gym?: string;
   workoutId?: string;
   notes?: string;
+  chartPace?: { category: WorkoutPaceCategory; secPerKm: number };
 }
 
 export interface Week {

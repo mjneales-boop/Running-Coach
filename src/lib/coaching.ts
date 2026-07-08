@@ -1,6 +1,6 @@
 import { SESSION_GUIDE } from '../constants/coaching';
 import type { GuideEntry } from '../constants/coaching';
-import type { Day } from '../types';
+import type { Day, Week } from '../types';
 
 export function guideEntriesForDay(day: Day): GuideEntry[] {
   const entries: GuideEntry[] = [];
@@ -40,4 +40,25 @@ export function guideEntriesForDay(day: Day): GuideEntry[] {
   if (/hill sprint/i.test(day.title + ' ' + (day.notes ?? ''))) entries.push(SESSION_GUIDE.hillSprints);
 
   return entries;
+}
+
+export interface WorkoutPacePoint {
+  weekId: string;
+  weekNum: string;
+  label: string;
+  category: NonNullable<Day['chartPace']>['category'];
+  secPerKm: number;
+}
+
+export function getWorkoutPaceProgression(weeks: Week[]): WorkoutPacePoint[] {
+  return weeks
+    .map((week) => ({ week, day: week.days.find((d) => d.chartPace) }))
+    .filter((x): x is { week: Week; day: Day & { chartPace: NonNullable<Day['chartPace']> } } => !!x.day)
+    .map(({ week, day }) => ({
+      weekId: week.id,
+      weekNum: week.num,
+      label: `W${week.num}`,
+      category: day.chartPace.category,
+      secPerKm: day.chartPace.secPerKm,
+    }));
 }
