@@ -7,11 +7,11 @@ import { Input } from '../components/ui/Input';
 import { useOura } from '../hooks/useOura';
 import { useStrava } from '../hooks/useStrava';
 import { useSettings } from '../hooks/useSettings';
-import { ATHLETE, RACE_NAME, RACE_DATE, GOAL_TIME, GOAL_PACE } from '../constants/plan';
-import { WEEKS } from '../hooks/usePlan';
+import { usePlanConfig } from '../hooks/usePlanConfig';
+import { useAuth } from '../hooks/useAuth';
 
-function raceShortName() {
-  return RACE_NAME.replace(/^EDP\s+/i, '').replace(/\s+\d{4}$/, '');
+function raceShortName(name: string) {
+  return name.replace(/^EDP\s+/i, '').replace(/\s+\d{4}$/, '');
 }
 
 function formatRaceDateEU(iso: string) {
@@ -133,8 +133,16 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const oura = useOura();
   const strava = useStrava();
   const { settings, update } = useSettings();
+  const { weeks, race, athlete } = usePlanConfig();
+  const { session, signOut } = useAuth();
 
-  const planWeeks = WEEKS.filter((w) => w.phase !== 0).length;
+  const planWeeks = weeks.filter((w) => w.phase !== 0).length;
+  const initials = (athlete.name || session?.user.email || '?')
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="min-h-screen bg-canvas px-[22px] pb-[60px] pt-1.5">
@@ -149,11 +157,11 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       {/* Profile */}
       <div className="mb-[26px] flex items-center gap-4 rounded-2xl border border-hairline bg-surface p-5">
         <div className="flex h-[54px] w-[54px] flex-none items-center justify-center rounded-full border border-hairline-strong bg-gradient-to-br from-[#1c2228] to-[#0e1114] font-mono text-base text-muted">
-          MX
+          {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-lg font-bold">{ATHLETE.name}</div>
-          <div className="mt-1 truncate font-mono text-[11px] text-muted">mjneales@icloud.com</div>
+          <div className="text-lg font-bold">{athlete.name}</div>
+          <div className="mt-1 truncate font-mono text-[11px] text-muted">{session?.user.email}</div>
         </div>
         <Chevron />
       </div>
@@ -190,11 +198,11 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       </SettingsSection>
 
       <SettingsSection title="Marathon plan">
-        <SettingsRow label="Goal race" value={<span className="font-semibold text-muted">{raceShortName()}</span>} />
-        <SettingsRow label="Race date" value={<span className="font-semibold text-muted">{formatRaceDateEU(RACE_DATE)}</span>} />
+        <SettingsRow label="Goal race" value={<span className="font-semibold text-muted">{raceShortName(race.name)}</span>} />
+        <SettingsRow label="Race date" value={<span className="font-semibold text-muted">{formatRaceDateEU(race.date)}</span>} />
         <SettingsRow
           label="Time goal"
-          value={<span className="font-bold text-accent">Sub-{formatGoalTime(GOAL_TIME)} · MP {GOAL_PACE}</span>}
+          value={<span className="font-bold text-accent">Sub-{formatGoalTime(race.goalTime)} · MP {race.goalPace}</span>}
         />
         <SettingsRow label="Plan length" value={<span className="font-semibold text-muted">{planWeeks} weeks · base → race</span>} />
       </SettingsSection>
@@ -276,9 +284,13 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         <SettingsRow label="Help & support" value={null} />
       </SettingsSection>
 
-      <div className="mb-4 flex items-center justify-center rounded-2xl border border-[rgba(229,103,92,0.3)] py-4">
+      <button
+        type="button"
+        onClick={() => void signOut()}
+        className="mb-4 flex w-full items-center justify-center rounded-2xl border border-[rgba(229,103,92,0.3)] py-4"
+      >
         <span className="text-[13px] font-bold uppercase tracking-[0.06em] text-warning">Sign out</span>
-      </div>
+      </button>
       <div className="text-center font-mono text-[10px] uppercase tracking-[0.14em] text-[#3a424b]">
         STRIDE · v1.0 · build 2026.10
       </div>

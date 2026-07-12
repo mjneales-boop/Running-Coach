@@ -1,10 +1,11 @@
-import { RACE_DATE, RACE_LOCATION, GOAL_TIME } from '../../constants/plan';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 import { formatDateShort } from '../../lib/logic';
 
 export function RaceDayCard() {
-  const dateLabel = formatDateShort(new Date(`${RACE_DATE}T12:00:00`));
-  const city = RACE_LOCATION.split('→').pop()?.trim() ?? RACE_LOCATION;
-  const goal = GOAL_TIME.split(':').slice(0, 2).join(':');
+  const { race } = usePlanConfig();
+  const dateLabel = formatDateShort(new Date(`${race.date}T12:00:00`));
+  const city = race.location.split('→').pop()?.trim() ?? race.location;
+  const goal = race.goalTime.split(':').slice(0, 2).join(':');
 
   return (
     <div className="stride-rise mt-7 flex items-center gap-3.5 rounded-2xl border border-[rgba(0,217,255,0.3)] bg-accent-tint p-5">

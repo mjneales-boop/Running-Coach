@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { WEEKS, PHASES } from '../constants/plan';
+import { usePlanConfig } from './usePlanConfig';
 import { findCurrentWeek, findTodaySession, daysToRace, currentPhase } from '../lib/logic';
 import type { Week, Day, PhaseInfo } from '../types';
 
@@ -10,16 +10,20 @@ interface PlanState {
   currentPhase: PhaseInfo;
   daysToRace: number;
   currentWeekIndex: number;
+  weeks: Week[];
+  phases: PhaseInfo[];
 }
 
 export function usePlan(today: Date, viewedWeekIndex: number): PlanState {
+  const plan = usePlanConfig();
   return useMemo(() => {
-    const cw = findCurrentWeek(today, WEEKS);
-    const cwIdx = WEEKS.indexOf(cw);
-    const vw = WEEKS[viewedWeekIndex] ?? cw;
+    const { weeks, phases, race } = plan;
+    const cw = findCurrentWeek(today, weeks);
+    const cwIdx = weeks.indexOf(cw);
+    const vw = weeks[viewedWeekIndex] ?? cw;
     const ts = findTodaySession(today, cw);
-    const phase = currentPhase(cw);
-    const countdown = daysToRace(today);
+    const phase = currentPhase(cw, phases);
+    const countdown = daysToRace(today, race);
 
     return {
       currentWeek: cw,
@@ -28,8 +32,8 @@ export function usePlan(today: Date, viewedWeekIndex: number): PlanState {
       currentPhase: phase,
       daysToRace: countdown,
       currentWeekIndex: cwIdx,
+      weeks,
+      phases,
     };
-  }, [today, viewedWeekIndex]);
+  }, [today, viewedWeekIndex, plan]);
 }
-
-export { WEEKS, PHASES };

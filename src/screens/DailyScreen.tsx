@@ -9,7 +9,7 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { useCurrentDate } from '../hooks/useCurrentDate';
-import { usePlan, WEEKS } from '../hooks/usePlan';
+import { usePlan } from '../hooks/usePlan';
 import { useCompletion } from '../hooks/useCompletion';
 import { useReadiness } from '../hooks/useReadiness';
 import { useOura } from '../hooks/useOura';
@@ -51,7 +51,7 @@ export function DailyScreen({
   onOpenDetails,
 }: DailyScreenProps) {
   const today = useCurrentDate();
-  const { currentWeek: rawCurrentWeek, currentPhase, daysToRace } = usePlan(today, 0);
+  const { currentWeek: rawCurrentWeek, currentPhase, daysToRace, weeks } = usePlan(today, 0);
   const { completion } = useCompletion();
   const { latestEntry } = useReadiness();
   const { swaps } = useSwaps();
@@ -72,7 +72,7 @@ export function DailyScreen({
     : null;
 
   const kmDone = weeklyKmDone(currentWeek, completion);
-  const nextDay = nextNonRestDay(today, currentWeek, WEEKS);
+  const nextDay = nextNonRestDay(today, currentWeek, weeks);
   const gymDay = nextGymDay(today, currentWeek);
   const todayStr = localDateKey(today);
   const isRest = !todaySession || todaySession.type === 'REST';

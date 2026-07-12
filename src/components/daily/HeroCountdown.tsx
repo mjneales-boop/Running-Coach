@@ -1,5 +1,5 @@
 import { Eyebrow } from '../ui/Eyebrow';
-import { RACE_NAME, RACE_DATE, GOAL_TIME, GOAL_PACE } from '../../constants/plan';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 import type { PhaseInfo, Week } from '../../types';
 
 function titleCase(s: string) {
@@ -23,7 +23,8 @@ interface HeroCountdownProps {
 }
 
 export function HeroCountdown({ daysToRace, week, phase }: HeroCountdownProps) {
-  const displayName = RACE_NAME.replace(/^EDP\s+/i, '');
+  const { race } = usePlanConfig();
+  const displayName = race.name.replace(/^EDP\s+/i, '');
 
   return (
     <div className="stride-rise mb-[22px] border-b border-hairline pb-6">
@@ -35,7 +36,7 @@ export function HeroCountdown({ daysToRace, week, phase }: HeroCountdownProps) {
         {displayName}
       </h1>
       <div className="font-mono text-xs uppercase tracking-[0.12em] text-muted">
-        {formatRaceDate(RACE_DATE)} · sub {formatGoalTime(GOAL_TIME)} · MP {GOAL_PACE}
+        {formatRaceDate(race.date)} · sub {formatGoalTime(race.goalTime)} · MP {race.goalPace}
       </div>
       <div className="mt-6 flex items-end gap-3.5">
         <div

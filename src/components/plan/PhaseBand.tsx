@@ -1,6 +1,6 @@
 import { WeekRow } from './WeekRow';
 import { weekFocus } from '../../lib/logic';
-import { PEAK_KM } from '../../constants/plan';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 import type { DayAbbr, PhaseInfo, Week } from '../../types';
 
 interface PhaseBandProps {
@@ -14,6 +14,7 @@ interface PhaseBandProps {
 }
 
 export function PhaseBand({ phase, weeks, currentWeekId, isCurrentPhase, openWeekId, onToggleWeek, onOpenDay }: PhaseBandProps) {
+  const { peakKm } = usePlanConfig();
   return (
     <div className="stride-rise pt-[26px]">
       <div className="flex items-baseline justify-between">
@@ -31,7 +32,7 @@ export function PhaseBand({ phase, weeks, currentWeekId, isCurrentPhase, openWee
             key={w.id}
             week={w}
             focus={weekFocus(w)}
-            maxKm={PEAK_KM}
+            maxKm={peakKm}
             isCurrent={w.id === currentWeekId}
             open={w.id === openWeekId}
             onToggle={() => onToggleWeek(w.id)}

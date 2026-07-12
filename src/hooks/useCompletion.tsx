@@ -1,34 +1,33 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { upsertCompletion, fetchCompletions } from '../lib/db';
+import { getCurrentUserId } from './useAuth';
 import type { CompletionEntry, DayAbbr } from '../types';
 
 type SyncedEntry = CompletionEntry & { weekId: string; day: DayAbbr; updatedAt?: number };
 type CompletionMap = Record<string, SyncedEntry>;
 
-const KEY = 'marathon-completion';
-const OUTBOX_KEY = 'marathon-completion-outbox';
-const MIGRATED_KEY = 'marathon-completion-migrated';
+// Per-user cache; the legacy unscoped `marathon-completion` key is left
+// untouched on the owner's device as a fallback.
+const KEY = () => `stride:${getCurrentUserId()}:completion`;
+const OUTBOX_KEY = () => `stride:${getCurrentUserId()}:completion-outbox`;
 
 function readLocal(): CompletionMap {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(KEY()) ?? '{}'); } catch { return {}; }
 }
 function writeLocal(data: CompletionMap) {
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(KEY(), JSON.stringify(data)); } catch { /* storage unavailable */ }
 }
 function readOutbox(): SyncedEntry[] {
-  try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]'); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(OUTBOX_KEY()) ?? '[]'); } catch { return []; }
 }
 function writeOutbox(entries: SyncedEntry[]) {
-  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(entries)); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(OUTBOX_KEY(), JSON.stringify(entries)); } catch { /* storage unavailable */ }
 }
 
 async function pushEntry(entry: SyncedEntry): Promise<boolean> {
   try {
-    const r = await fetch('/api/completion', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    });
-    return r.ok;
+    await upsertCompletion(entry);
+    return true;
   } catch { return false; }
 }
 
@@ -44,10 +43,7 @@ async function flushOutbox(): Promise<void> {
 
 async function fetchRemote(): Promise<SyncedEntry[]> {
   try {
-    const r = await fetch('/api/completion');
-    if (!r.ok) return [];
-    const data = (await r.json()) as { entries?: SyncedEntry[] };
-    return data.entries ?? [];
+    return await fetchCompletions();
   } catch { return []; }
 }
 
@@ -90,29 +86,6 @@ export function CompletionProvider({ children }: { children: ReactNode }) {
     } finally {
       syncing.current = false;
     }
-  }, []);
-
-  // One-time migration of existing localStorage-only data (pre-cross-device-sync) into Redis
-  useEffect(() => {
-    if (localStorage.getItem(MIGRATED_KEY)) return;
-    const local = readLocal();
-    const rows = Object.entries(local);
-    localStorage.setItem(MIGRATED_KEY, '1');
-    if (rows.length === 0) return;
-    const now = Date.now();
-    void (async () => {
-      for (const [key, entry] of rows) {
-        if (entry.weekId && entry.day) {
-          await pushEntry({ ...entry, updatedAt: entry.updatedAt ?? now });
-          continue;
-        }
-        // Legacy rows saved before weekId/day were embedded in the entry — derive from the map key.
-        const dash = key.lastIndexOf('-');
-        const weekId = key.slice(0, dash);
-        const day = key.slice(dash + 1) as DayAbbr;
-        await pushEntry({ ...entry, weekId, day, updatedAt: now });
-      }
-    })();
   }, []);
 
   // Background sync on mount

@@ -18,7 +18,11 @@ import { GymScheduleProvider, useGymSchedule } from './hooks/useGymSchedule';
 import { OuraProvider, useOura } from './hooks/useOura';
 import { StravaProvider, useStrava } from './hooks/useStrava';
 import { useAutoSync } from './hooks/useAutoSync';
-import { usePlan, WEEKS } from './hooks/usePlan';
+import { usePlan } from './hooks/usePlan';
+import { AuthProvider, useAuth } from './hooks/useAuth';
+import { PlanProvider } from './hooks/usePlanConfig';
+import { AuthScreen } from './screens/AuthScreen';
+import { MigrationGate } from './components/MigrationGate';
 import { applySwapsToWeek, applyGymOverrides } from './lib/logic';
 import type { DayAbbr, StravaActivity } from './types';
 
@@ -28,18 +32,44 @@ interface SessionModalTarget {
 }
 
 export default function App() {
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('uikit')) {
+    return <UiKitDemo />;
+  }
   return (
-    <CompletionProvider>
-      <SwapsProvider>
-        <GymScheduleProvider>
-          <OuraProvider>
-            <StravaProvider>
-              <AppShell />
-            </StravaProvider>
-          </OuraProvider>
-        </GymScheduleProvider>
-      </SwapsProvider>
-    </CompletionProvider>
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
+}
+
+function AuthGate() {
+  const { session, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <div className="font-display text-sm font-black uppercase tracking-[0.22em] text-faint">
+          Stride
+        </div>
+      </div>
+    );
+  }
+  if (!session) return <AuthScreen />;
+  return (
+    <MigrationGate>
+      <PlanProvider>
+        <CompletionProvider>
+          <SwapsProvider>
+            <GymScheduleProvider>
+              <OuraProvider>
+                <StravaProvider>
+                  <AppShell />
+                </StravaProvider>
+              </OuraProvider>
+            </GymScheduleProvider>
+          </SwapsProvider>
+        </CompletionProvider>
+      </PlanProvider>
+    </MigrationGate>
   );
 }
 
@@ -52,7 +82,7 @@ function AppShell() {
   const [readinessModalOpen, setReadinessModalOpen] = useState(false);
   const [strengthFocus, setStrengthFocus] = useState<SessionModalTarget | null>(null);
 
-  const { currentWeek, todaySession } = usePlan(today, 0);
+  const { currentWeek, todaySession, weeks } = usePlan(today, 0);
   const { completion, toggleDone, setNotes } = useCompletion();
   const { latestEntry, logEntry } = useReadiness();
   const { swaps, swapDays } = useSwaps();
@@ -85,10 +115,6 @@ function AppShell() {
   useEffect(() => {
     if (tab !== 'strength') setStrengthFocus(null);
   }, [tab]);
-
-  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('uikit')) {
-    return <UiKitDemo />;
-  }
 
   return (
     <>
@@ -131,7 +157,7 @@ function AppShell() {
       {/* Session modal (bridge — retired once each tab gets its own STRIDE detail view) */}
       {sessionModal &&
         (() => {
-          const rawWeek = WEEKS.find((w) => w.id === sessionModal.weekId)!;
+          const rawWeek = weeks.find((w) => w.id === sessionModal.weekId)!;
           const modalWeek = applyGymOverrides(
             applySwapsToWeek(rawWeek, swaps[sessionModal.weekId] ?? {}),
             gymOverrides,

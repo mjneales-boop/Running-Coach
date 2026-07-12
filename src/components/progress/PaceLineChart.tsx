@@ -1,6 +1,6 @@
 import { ComposedChart, Area, Line, ResponsiveContainer, YAxis, ReferenceLine, Tooltip } from 'recharts';
 import type { PacePoint } from '../../lib/logic';
-import { GOAL_PACE } from '../../constants/plan';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 
 interface PaceLineChartProps {
   pace: PacePoint[];
@@ -14,6 +14,7 @@ function fmtPace(min: number): string {
 }
 
 export function PaceLineChart({ pace, goalPaceMin }: PaceLineChartProps) {
+  const { race } = usePlanConfig();
   return (
     <div className="stride-rise mb-[22px] rounded-[18px] border border-hairline bg-surface p-[22px]">
       <div className="mb-1.5 flex items-baseline justify-between">
@@ -21,7 +22,7 @@ export function PaceLineChart({ pace, goalPaceMin }: PaceLineChartProps) {
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">min/km</span>
       </div>
       <div className="mb-4 font-mono text-[10.5px] tracking-[0.02em] text-muted">
-        Lower = fitter · trending toward MP {GOAL_PACE}
+        Lower = fitter · trending toward MP {race.goalPace}
       </div>
       <div className="h-[160px]">
         <ResponsiveContainer width="100%" height="100%">
@@ -50,7 +51,7 @@ export function PaceLineChart({ pace, goalPaceMin }: PaceLineChartProps) {
                     fontSize={10.5}
                     fontFamily="var(--font-mono)"
                   >
-                    MP {GOAL_PACE}
+                    MP {race.goalPace}
                   </text>
                 );
               }}

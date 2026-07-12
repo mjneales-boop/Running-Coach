@@ -2,7 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
 import { useCompletion } from './useCompletion';
-import { WEEKS } from '../constants/plan';
+import { usePlanConfig } from './usePlanConfig';
+import { getCurrentUserId } from './useAuth';
 import { formatPaceMinKm } from '../lib/format';
 import type { StravaActivity } from '../types';
 
@@ -12,7 +13,8 @@ interface StravaSyncResponse {
   data: StravaMap;
 }
 
-const SYNC_TS_KEY = 'marathon-strava-synced';
+// Device-local throttle timestamp, scoped per user (legacy key left untouched).
+const SYNC_TS_KEY = () => `stride:${getCurrentUserId()}:strava-synced`;
 
 interface UseStrava {
   connected: boolean | null;
@@ -35,12 +37,13 @@ export function StravaProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(() => {
     try {
-      const ts = localStorage.getItem(SYNC_TS_KEY);
+      const ts = localStorage.getItem(SYNC_TS_KEY());
       return ts ? new Date(Number(ts)) : null;
     } catch { return null; }
   });
   const [lastError, setLastError] = useState<string | null>(null);
   const { setActual } = useCompletion();
+  const { weeks } = usePlanConfig();
 
   useEffect(() => {
     fetch('/api/strava/status')
@@ -61,7 +64,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
 
   const autoComplete = useCallback(
     async (activities: StravaMap) => {
-      for (const week of WEEKS) {
+      for (const week of weeks) {
         for (const day of week.days) {
           if (day.type === 'REST') continue;
           const activity = activities[day.date];
@@ -75,7 +78,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [setActual],
+    [setActual, weeks],
   );
 
   const sync = useCallback(
@@ -114,7 +117,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
 
         const now = new Date();
         setLastSynced(now);
-        try { localStorage.setItem(SYNC_TS_KEY, String(now.getTime())); } catch {}
+        try { localStorage.setItem(SYNC_TS_KEY(), String(now.getTime())); } catch {}
         return merged;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

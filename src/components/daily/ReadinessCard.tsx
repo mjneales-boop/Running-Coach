@@ -1,5 +1,5 @@
 import { readinessHeadline } from '../../lib/logic';
-import { ATHLETE } from '../../constants/plan';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 import { Button } from '../ui/Button';
 import type { ReadinessEntry } from '../../types';
 
@@ -37,6 +37,7 @@ interface ReadinessCardNotConnectedProps {
 type ReadinessCardProps = ReadinessCardConnectedProps | ReadinessCardNotConnectedProps;
 
 export function ReadinessCard(props: ReadinessCardProps) {
+  const { athlete } = usePlanConfig();
   if (props.variant === 'not-connected') {
     return (
       <div className="stride-rise mb-[26px] rounded-[18px] border border-dashed border-hairline-strong bg-surface px-[22px] py-[30px] text-center">
@@ -76,9 +77,9 @@ export function ReadinessCard(props: ReadinessCardProps) {
         </div>
       </div>
       <div className="grid grid-cols-3 gap-0.5 border-t border-hairline">
-        <Metric label="HRV" value={entry.hrv} unit="ms" baseline={ATHLETE.baselineHRV} isFirst />
-        <Metric label="RHR" value={entry.rhr} unit="bpm" baseline={ATHLETE.baselineRHR} />
-        <Metric label="Sleep" value={entry.sleep} unit="h" baseline={ATHLETE.baselineSleep} />
+        <Metric label="HRV" value={entry.hrv} unit="ms" baseline={athlete.baselineHRV} isFirst />
+        <Metric label="RHR" value={entry.rhr} unit="bpm" baseline={athlete.baselineRHR} />
+        <Metric label="Sleep" value={entry.sleep} unit="h" baseline={athlete.baselineSleep} />
       </div>
     </div>
   );

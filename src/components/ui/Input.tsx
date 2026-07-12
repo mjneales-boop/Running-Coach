@@ -1,8 +1,10 @@
-import type { ChangeEventHandler } from 'react';
+import type { ChangeEventHandler, FocusEventHandler } from 'react';
 
 interface InputProps {
   value: string;
   onChange: ChangeEventHandler<HTMLInputElement>;
+  onFocus?: FocusEventHandler<HTMLInputElement>;
+  onBlur?: FocusEventHandler<HTMLInputElement>;
   unit?: string;
   placeholder?: string;
   inputMode?: 'decimal' | 'numeric' | 'text';
@@ -13,6 +15,8 @@ interface InputProps {
 export function Input({
   value,
   onChange,
+  onFocus,
+  onBlur,
   unit,
   placeholder,
   inputMode = 'text',
@@ -24,6 +28,8 @@ export function Input({
       <input
         value={value}
         onChange={onChange}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={placeholder}
         inputMode={inputMode}
         className={`min-w-0 flex-1 bg-transparent py-2.5 font-display text-base font-bold text-ink outline-none ${

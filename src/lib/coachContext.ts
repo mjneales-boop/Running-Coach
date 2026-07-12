@@ -1,4 +1,5 @@
-import { WEEKS, ZONES, RACE_NAME, RACE_DATE, GOAL_TIME, GOAL_PACE, ATHLETE, SEED_READINESS } from '../constants/plan';
+import { SEED_READINESS } from '../constants/plan';
+import type { PlanConfig } from '../hooks/usePlanConfig';
 import {
   findCurrentWeek,
   findCurrentWeekIndex,
@@ -73,9 +74,9 @@ function weekdayShort(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-function upcomingDays(today: Date, count = 10, guideDepth = 4) {
+function upcomingDays(today: Date, weeks: Week[], count = 10, guideDepth = 4) {
   const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  return WEEKS.flatMap((w) => w.days)
+  return weeks.flatMap((w) => w.days)
     .filter((d) => d.date >= t)
     .slice(0, count)
     .map((d, i) => ({
@@ -94,34 +95,36 @@ export function buildCoachContext(
   completion: Record<string, CompletionEntry>,
   readinessEntry: ReadinessEntry,
   stravaActivities: Record<string, StravaActivity> = {},
+  plan: PlanConfig,
 ): CoachContext {
-  const week = findCurrentWeek(today, WEEKS);
-  const weekIndex = findCurrentWeekIndex(today, WEEKS);
-  const phase = currentPhase(week);
+  const { weeks, zones, phases, peakKm, race, athlete } = plan;
+  const week = findCurrentWeek(today, weeks);
+  const weekIndex = findCurrentWeekIndex(today, weeks);
+  const phase = currentPhase(week, phases);
   const todaySession = findTodaySession(today, week);
   const r = readinessEntry.score != null ? readinessEntry : SEED_READINESS;
   const { headline } = readinessHeadline(r.score);
   const activities = Object.values(stravaActivities).sort((a, b) => b.date.localeCompare(a.date));
-  const progress = buildProgressStats(WEEKS, completion, weekIndex);
+  const progress = buildProgressStats(weeks, completion, weekIndex, peakKm);
   const recentWeeks = progress.volume
     .filter((v) => !v.isPlanned)
     .slice(-4)
-    .map((v) => ({ label: v.label, kmDone: v.km, targetKm: WEEKS.find((w) => w.id === v.weekId)!.targetKm }));
+    .map((v) => ({ label: v.label, kmDone: v.km, targetKm: weeks.find((w) => w.id === v.weekId)!.targetKm }));
 
   return {
-    race: { name: RACE_NAME, date: RACE_DATE, goalTime: GOAL_TIME, goalPace: GOAL_PACE },
-    week: { num: week.num, phase: phase.name, daysOut: daysToRace(today), targetKm: week.targetKm, doneKm: weeklyKmDone(week, completion) },
+    race: { name: race.name, date: race.date, goalTime: race.goalTime, goalPace: race.goalPace },
+    week: { num: week.num, phase: phase.name, daysOut: daysToRace(today, race), targetKm: week.targetKm, doneKm: weeklyKmDone(week, completion) },
     readiness: {
       score: r.score,
       headline,
       hrv: r.hrv,
       rhr: r.rhr,
       sleep: r.sleep,
-      baselineHRV: ATHLETE.baselineHRV,
-      baselineRHR: ATHLETE.baselineRHR,
-      baselineSleep: ATHLETE.baselineSleep,
+      baselineHRV: athlete.baselineHRV,
+      baselineRHR: athlete.baselineRHR,
+      baselineSleep: athlete.baselineSleep,
     },
-    zones: ZONES.map((z) => ({ name: z.name, pace: z.pace, hr: z.hr })),
+    zones: zones.map((z) => ({ name: z.name, pace: z.pace, hr: z.hr })),
     today: todaySession
       ? {
           type: todaySession.type,
@@ -133,7 +136,7 @@ export function buildCoachContext(
           readinessAdjustment: readinessAdjustment(r.score),
         }
       : null,
-    upcoming: upcomingDays(today),
+    upcoming: upcomingDays(today, weeks),
     recentRuns: activities.slice(0, 10).map((a) => ({
       date: a.date,
       distanceKm: a.distanceKm,
@@ -160,10 +163,10 @@ function weekStatusLine(week: Week): string {
 }
 
 /** Opening chat bubble, regenerated fresh each time — reflects today's actual plan position, not persisted history. */
-export function coachGreeting(today: Date): string {
-  const week = findCurrentWeek(today, WEEKS);
-  const phase = currentPhase(week);
-  const daysOut = daysToRace(today);
+export function coachGreeting(today: Date, plan: PlanConfig): string {
+  const week = findCurrentWeek(today, plan.weeks);
+  const phase = currentPhase(week, plan.phases);
+  const daysOut = daysToRace(today, plan.race);
   return `${timeOfDayGreeting(today)}. You're ${daysOut} days out, week ${week.num} of ${phase.short.toLowerCase()} — ${weekStatusLine(
     week,
   )}. Ask me about today, your paces, or the week ahead.`;

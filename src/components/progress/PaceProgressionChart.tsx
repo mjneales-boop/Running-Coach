@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { WEEKS } from '../../constants/plan';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 import { getWorkoutPaceProgression } from '../../lib/coaching';
 import type { WorkoutPaceCategory } from '../../types';
 
@@ -28,7 +28,8 @@ function fmtPace(sec: number): string {
 }
 
 export function PaceProgressionChart({ currentWeekId }: PaceProgressionChartProps) {
-  const points = getWorkoutPaceProgression(WEEKS);
+  const { weeks } = usePlanConfig();
+  const points = getWorkoutPaceProgression(weeks);
 
   return (
     <div className="stride-rise mb-6 rounded-[18px] border border-hairline bg-surface p-[22px]">

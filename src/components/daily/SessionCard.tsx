@@ -2,6 +2,7 @@ import { Tag } from '../ui/Tag';
 import { Button } from '../ui/Button';
 import { restDayNote, runDayNote, SESSION_TYPE_LABEL, ACTION_LABEL } from '../../lib/coachNotes';
 import { zoneForPace, estimateDuration } from '../../lib/logic';
+import { usePlanConfig } from '../../hooks/usePlanConfig';
 import type { Day } from '../../types';
 
 interface SessionCardRestProps {
@@ -37,6 +38,7 @@ export function StatBlock({ label, value, unit, isFirst }: { label: string; valu
 }
 
 export function SessionCard(props: SessionCardProps) {
+  const { zones } = usePlanConfig();
   if (props.variant === 'rest') {
     const { weekMeta, gym, done, onComplete, onDetails } = props;
     const actionLabel = gym ? 'Mark lift done' : ACTION_LABEL.REST;
@@ -70,7 +72,7 @@ export function SessionCard(props: SessionCardProps) {
 
   const { weekMeta, day, done, onStart, onDetails } = props;
   const label = SESSION_TYPE_LABEL[day.type];
-  const zone = zoneForPace(day.pace);
+  const zone = zoneForPace(day.pace, zones);
   const duration = estimateDuration(day);
 
   return (

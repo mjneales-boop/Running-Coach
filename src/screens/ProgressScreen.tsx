@@ -9,13 +9,13 @@ import { TopLiftsList } from '../components/progress/TopLiftsList';
 import { StrengthView } from '../components/StrengthView';
 import { Sheet } from '../components/ui/Sheet';
 import { useCurrentDate } from '../hooks/useCurrentDate';
-import { usePlan, WEEKS } from '../hooks/usePlan';
+import { usePlan } from '../hooks/usePlan';
+import { usePlanConfig } from '../hooks/usePlanConfig';
 import { useCompletion } from '../hooks/useCompletion';
 import { useStrength } from '../hooks/useStrength';
 import { useStorage } from '../hooks/useStorage';
 import { buildProgressStats, buildPaceProgression } from '../lib/logic';
 import { topLifts } from '../lib/strength';
-import { GOAL_PACE } from '../constants/plan';
 import type { StravaActivity } from '../types';
 
 function localDateKey(date: Date) {
@@ -35,19 +35,20 @@ interface ProgressScreenProps {
 
 export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: ProgressScreenProps) {
   const today = useCurrentDate();
-  const { currentWeekIndex } = usePlan(today, 0);
+  const { currentWeekIndex, weeks } = usePlan(today, 0);
+  const { zones, peakKm, race } = usePlanConfig();
   const { completion } = useCompletion();
   const { strength } = useStrength();
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
   const [insightsOpen, setInsightsOpen] = useState(false);
 
   const stats = useMemo(
-    () => buildProgressStats(WEEKS, completion, currentWeekIndex),
-    [completion, currentWeekIndex],
+    () => buildProgressStats(weeks, completion, currentWeekIndex, peakKm),
+    [weeks, completion, currentWeekIndex, peakKm],
   );
   const pace = useMemo(
-    () => buildPaceProgression(WEEKS, Object.values(stravaActivities)),
-    [stravaActivities],
+    () => buildPaceProgression(weeks, Object.values(stravaActivities), zones, race.goalPace),
+    [weeks, stravaActivities, zones, race.goalPace],
   );
   const lifts = useMemo(() => topLifts(strength, localDateKey(today)), [strength, today]);
 
@@ -74,7 +75,7 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
       />
 
       <VolumeBarChart volume={stats.volume} />
-      <PaceLineChart pace={pace} goalPaceMin={parsePace(GOAL_PACE)} />
+      <PaceLineChart pace={pace} goalPaceMin={parsePace(race.goalPace)} />
       <TopLiftsList lifts={lifts} onOpenInsights={() => setInsightsOpen(true)} />
 
       <TabBar active={activeTab} onChange={onTabChange} />

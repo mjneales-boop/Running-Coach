@@ -5,7 +5,7 @@ import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { PhaseBand } from '../components/plan/PhaseBand';
 import { RaceDayCard } from '../components/plan/RaceDayCard';
 import { useCurrentDate } from '../hooks/useCurrentDate';
-import { usePlan, WEEKS } from '../hooks/usePlan';
+import { usePlan } from '../hooks/usePlan';
 import { groupWeeksByPhase } from '../lib/logic';
 import type { DayAbbr } from '../types';
 
@@ -18,13 +18,13 @@ interface FullPlanScreenProps {
 
 export function FullPlanScreen({ activeTab, onTabChange, onOpenSettings, onOpenSession }: FullPlanScreenProps) {
   const today = useCurrentDate();
-  const { currentWeekIndex } = usePlan(today, 0);
-  const currentWeekId = WEEKS[currentWeekIndex]?.id;
-  const currentPhaseNum = WEEKS[currentWeekIndex]?.phase;
+  const { currentWeekIndex, weeks, phases } = usePlan(today, 0);
+  const currentWeekId = weeks[currentWeekIndex]?.id;
+  const currentPhaseNum = weeks[currentWeekIndex]?.phase;
   const [openWeekId, setOpenWeekId] = useState<string | null>(currentWeekId ?? null);
 
-  const realWeeks = useMemo(() => WEEKS.filter((w) => w.phase !== 0), []);
-  const groups = useMemo(() => groupWeeksByPhase(realWeeks), [realWeeks]);
+  const realWeeks = useMemo(() => weeks.filter((w) => w.phase !== 0), [weeks]);
+  const groups = useMemo(() => groupWeeksByPhase(realWeeks, phases), [realWeeks, phases]);
 
   return (
     <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">

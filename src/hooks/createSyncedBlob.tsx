@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { getBlob, setBlob } from '../lib/db';
+import { getCurrentUserId } from './useAuth';
 
 interface SyncedBlob<T> {
   value: T;
@@ -6,50 +8,41 @@ interface SyncedBlob<T> {
 }
 
 /**
- * Small JSON blobs (day swaps, gym-day overrides, ...) used to live in localStorage
- * only, so a change made on one device never appeared on another. This gives each
- * one a Redis-backed store (same last-write-wins merge as useCompletion) behind a
- * single shared context, so every component reading it sees the same value —
- * mirrors the fix applied to useCompletion for the same reason.
+ * Small JSON blobs (day swaps, gym-day overrides, ...) stored per user in the
+ * user_blobs table (last-write-wins by updatedAt, same convention as
+ * useCompletion) behind a single shared context, so every component reading it
+ * sees the same value. localStorage keeps a per-user cache for instant loads;
+ * the legacy unscoped `marathon-{resource}` keys stay untouched as fallback.
  */
 export function createSyncedBlob<T>(resource: string, initial: T) {
-  const KEY = `marathon-${resource}`;
-  const TS_KEY = `${KEY}-ts`;
-  const REMOTE_URL = `/api/completion?resource=${resource}`;
+  const KEY = () => `stride:${getCurrentUserId()}:${resource}`;
+  const TS_KEY = () => `${KEY()}-ts`;
 
   function readLocal(): T {
     try {
-      const raw = localStorage.getItem(KEY);
+      const raw = localStorage.getItem(KEY());
       return raw ? (JSON.parse(raw) as T) : initial;
     } catch { return initial; }
   }
   function writeLocal(v: T) {
-    try { localStorage.setItem(KEY, JSON.stringify(v)); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(KEY(), JSON.stringify(v)); } catch { /* storage unavailable */ }
   }
   function readLocalTs(): number {
-    try { return Number(localStorage.getItem(TS_KEY) ?? 0); } catch { return 0; }
+    try { return Number(localStorage.getItem(TS_KEY()) ?? 0); } catch { return 0; }
   }
   function writeLocalTs(ts: number) {
-    try { localStorage.setItem(TS_KEY, String(ts)); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(TS_KEY(), String(ts)); } catch { /* storage unavailable */ }
   }
 
   async function pushRemote(value: T, updatedAt: number) {
     try {
-      await fetch(REMOTE_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value, updatedAt }),
-      });
+      await setBlob(resource, value, updatedAt);
     } catch { /* best-effort — local write already applied */ }
   }
 
   async function fetchRemote(): Promise<{ value: T; updatedAt: number } | null> {
     try {
-      const r = await fetch(REMOTE_URL);
-      if (!r.ok) return null;
-      const data = (await r.json()) as { value: T | null; updatedAt: number };
-      if (data.value == null) return null;
-      return { value: data.value, updatedAt: data.updatedAt ?? 0 };
+      return await getBlob<T>(resource);
     } catch { return null; }
   }
 

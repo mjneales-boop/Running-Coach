@@ -1,34 +1,33 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { upsertStrength, fetchStrength } from '../lib/db';
+import { getCurrentUserId } from './useAuth';
 import type { SetLog, WorkoutLog } from '../types';
 
 type SyncedLog = WorkoutLog & { updatedAt?: number };
 type StrengthMap = Record<string, SyncedLog>;
 
-const KEY = 'marathon-strength';
-const OUTBOX_KEY = 'marathon-strength-outbox';
-const MIGRATED_KEY = 'marathon-strength-migrated';
+// Per-user cache; the legacy unscoped `marathon-strength` key is left
+// untouched on the owner's device as a fallback.
+const KEY = () => `stride:${getCurrentUserId()}:strength`;
+const OUTBOX_KEY = () => `stride:${getCurrentUserId()}:strength-outbox`;
 
 function readLocal(): StrengthMap {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(KEY()) ?? '{}'); } catch { return {}; }
 }
 function writeLocal(data: StrengthMap) {
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {}
+  try { localStorage.setItem(KEY(), JSON.stringify(data)); } catch {}
 }
 function readOutbox(): SyncedLog[] {
-  try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]'); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(OUTBOX_KEY()) ?? '[]'); } catch { return []; }
 }
 function writeOutbox(entries: SyncedLog[]) {
-  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(entries)); } catch {}
+  try { localStorage.setItem(OUTBOX_KEY(), JSON.stringify(entries)); } catch {}
 }
 
 async function pushEntry(entry: SyncedLog): Promise<boolean> {
   try {
-    const r = await fetch('/api/strength', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
-    });
-    return r.ok;
+    await upsertStrength(entry);
+    return true;
   } catch { return false; }
 }
 
@@ -44,10 +43,7 @@ async function flushOutbox(): Promise<void> {
 
 async function fetchRemote(): Promise<SyncedLog[]> {
   try {
-    const r = await fetch('/api/strength');
-    if (!r.ok) return [];
-    const data = (await r.json()) as { entries?: SyncedLog[] };
-    return data.entries ?? [];
+    return await fetchStrength();
   } catch { return []; }
 }
 
@@ -74,21 +70,6 @@ export function useStrength() {
     } finally {
       syncing.current = false;
     }
-  }, []);
-
-  // One-time migration of existing localStorage data into Redis
-  useEffect(() => {
-    if (localStorage.getItem(MIGRATED_KEY)) return;
-    const local = readLocal();
-    const entries = Object.values(local);
-    localStorage.setItem(MIGRATED_KEY, '1');
-    if (entries.length === 0) return;
-    const now = Date.now();
-    void (async () => {
-      for (const entry of entries) {
-        await pushEntry({ ...entry, updatedAt: entry.updatedAt ?? now });
-      }
-    })();
   }, []);
 
   // Background sync on mount

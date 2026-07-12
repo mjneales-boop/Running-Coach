@@ -1,5 +1,11 @@
-import { ATHLETE, PHASES, ZONES, GOAL_PACE, PEAK_KM } from '../constants/plan';
 import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, GymOverrides, Zone, StravaActivity } from '../types';
+
+/** Structural subset of PlanConfig.athlete — anything with baselines works. */
+export interface AthleteBaselines {
+  baselineHRV: number;
+  baselineRHR: number;
+  baselineSleep: number;
+}
 
 function localDateStr(date: Date): string {
   const y = date.getFullYear();
@@ -31,9 +37,10 @@ export function findTodaySession(today: Date, week: Week): Day | undefined {
   return week.days.find((d) => d.date === t);
 }
 
-export function daysToRace(today: Date): number {
-  const race = new Date('2026-10-10T08:00:00');
-  return Math.max(0, Math.ceil((race.getTime() - today.getTime()) / 86400000));
+export function daysToRace(today: Date, race: { date: string; time?: string }): number {
+  if (!race.date) return 0;
+  const raceStart = new Date(`${race.date}T${race.time || '08:00'}:00`);
+  return Math.max(0, Math.ceil((raceStart.getTime() - today.getTime()) / 86400000));
 }
 
 export function readinessTier(score: number): ReadinessTier {
@@ -93,18 +100,18 @@ export function weeklyKmDone(week: Week, completion: Record<string, CompletionEn
   return Math.round(total * 100) / 100;
 }
 
-export function currentPhase(week: Week): PhaseInfo {
-  return PHASES.find((p) => p.num === week.phase)!;
+export function currentPhase(week: Week, phases: PhaseInfo[]): PhaseInfo {
+  return phases.find((p) => p.num === week.phase) ?? phases[0];
 }
 
-export function groupWeeksByPhase(weeks: Week[]): { phase: PhaseInfo; weeks: Week[] }[] {
+export function groupWeeksByPhase(weeks: Week[], phases: PhaseInfo[]): { phase: PhaseInfo; weeks: Week[] }[] {
   const groups: { phase: PhaseInfo; weeks: Week[] }[] = [];
   for (const w of weeks) {
     const last = groups[groups.length - 1];
     if (last && last.phase.num === w.phase) {
       last.weeks.push(w);
     } else {
-      groups.push({ phase: currentPhase(w), weeks: [w] });
+      groups.push({ phase: currentPhase(w, phases), weeks: [w] });
     }
   }
   return groups;
@@ -159,12 +166,12 @@ export function nextNonRestDay(today: Date, week: Week, allWeeks?: Week[]): Day 
   return undefined;
 }
 
-export function zoneForPace(paceStr: string | undefined): Zone | undefined {
+export function zoneForPace(paceStr: string | undefined, zones: Zone[]): Zone | undefined {
   if (!paceStr) return undefined;
-  const exact = ZONES.find((z) => z.pace === paceStr);
+  const exact = zones.find((z) => z.pace === paceStr);
   if (exact) return exact;
   const lower = paceStr.toLowerCase();
-  return ZONES.find((z) => lower.includes(z.name.toLowerCase().split(' ')[0]));
+  return zones.find((z) => lower.includes(z.name.toLowerCase().split(' ')[0]));
 }
 
 function paceToMinutes(pace: string): number | undefined {
@@ -236,23 +243,24 @@ export function readinessTrendColor(dir: 'good-up' | 'good-down' | 'flat'): stri
   return 'var(--text-muted)';
 }
 
-export function metricBaseline(key: 'hrv' | 'rhr' | 'sleep'): number {
-  if (key === 'hrv') return ATHLETE.baselineHRV;
-  if (key === 'rhr') return ATHLETE.baselineRHR;
-  return ATHLETE.baselineSleep;
+export function metricBaseline(key: 'hrv' | 'rhr' | 'sleep', athlete: AthleteBaselines): number {
+  if (key === 'hrv') return athlete.baselineHRV;
+  if (key === 'rhr') return athlete.baselineRHR;
+  return athlete.baselineSleep;
 }
 
 export function readinessSecondaryWarnings(
   entries: ReadinessEntry[],
+  athlete: AthleteBaselines,
 ): string[] {
   const warnings: string[] = [];
   const last2 = entries.slice(-2);
 
   if (last2.length === 2) {
-    const rhrAbove = last2.every((e) => (e.rhr ?? 0) > ATHLETE.baselineRHR + 7);
+    const rhrAbove = last2.every((e) => (e.rhr ?? 0) > athlete.baselineRHR + 7);
     if (rhrAbove) warnings.push('RHR elevated 2+ days — drop intensity');
 
-    const hrvBelow = last2.every((e) => (e.hrv ?? Infinity) < ATHLETE.baselineHRV - 13);
+    const hrvBelow = last2.every((e) => (e.hrv ?? Infinity) < athlete.baselineHRV - 13);
     if (hrvBelow) warnings.push('HRV suppressed 2+ days — easy day');
   }
 
@@ -288,6 +296,7 @@ export function buildProgressStats(
   weeks: Week[],
   completion: Record<string, CompletionEntry>,
   currentWeekIndex: number,
+  peakKm: number,
 ): ProgressStats {
   const volume: WeekVolumePoint[] = weeks.map((w, i) => {
     const isPlanned = i > currentWeekIndex;
@@ -305,7 +314,7 @@ export function buildProgressStats(
   const curKm = volume[currentWeekIndex]?.km ?? 0;
   const rampPct = prevKm > 0 ? Math.round(((curKm - prevKm) / prevKm) * 100) : 0;
 
-  return { fourWeekAvgKm, peakWeekKm: PEAK_KM, rampPct, volume };
+  return { fourWeekAvgKm, peakWeekKm: peakKm, rampPct, volume };
 }
 
 function parsePaceToMinutes(pace: string): number {
@@ -320,12 +329,17 @@ export interface PacePoint {
   planned: number;
 }
 
-export function buildPaceProgression(weeks: Week[], activities: StravaActivity[]): PacePoint[] {
-  const easyZone = ZONES.find((z) => z.name === 'Easy')!;
+export function buildPaceProgression(
+  weeks: Week[],
+  activities: StravaActivity[],
+  zones: Zone[],
+  goalPace: string,
+): PacePoint[] {
+  const easyZone = zones.find((z) => z.name === 'Easy')!;
   const [easyLo, easyHi] = easyZone.pace.split('–').map(parsePaceToMinutes);
   const easyMid = (easyLo + easyHi) / 2;
-  const goalPaceMin = parsePaceToMinutes(GOAL_PACE);
-  const steadyZone = ZONES.find((z) => z.name === 'Steady')!;
+  const goalPaceMin = parsePaceToMinutes(goalPace);
+  const steadyZone = zones.find((z) => z.name === 'Steady')!;
   const steadyLo = parsePaceToMinutes(steadyZone.pace.split('–')[0]);
 
   return weeks.map((w, i) => {

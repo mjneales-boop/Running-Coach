@@ -1,0 +1,44 @@
+# Nightly Supabase backup (free tier has no automated backups).
+# Dumps public + auth schemas via pg_dump and keeps 30 days of artifacts.
+#
+# Required repo secret:
+#   SUPABASE_DB_URL — the SESSION POOLER connection string
+#     (Supabase Dashboard → Connect → Session pooler, port 5432,
+#      host *.pooler.supabase.com — the direct DB host is IPv6-only and
+#      unreachable from GitHub runners).
+name: db-backup
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC nightly
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgresql-client-17 (must match Supabase server major)
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump database
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_dump \
+            --clean --if-exists --no-owner --no-privileges \
+            --schema=public --schema=auth \
+            "$DB_URL" | gzip > "stride-$(date -u +%Y-%m-%dT%H%M).sql.gz"
+          ls -lh stride-*.sql.gz
+          # Fail loudly on a suspiciously small dump (auth error → empty file)
+          test "$(stat -c%s stride-*.sql.gz)" -gt 1000
+
+      - name: Upload artifact (30-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: '*.sql.gz'
+          retention-days: 30

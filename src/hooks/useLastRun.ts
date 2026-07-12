@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
+import { getCurrentUserId } from './useAuth';
 import type { StravaRunDetail } from '../types';
 
 const CACHE_KEY = 'marathon-strava-lastrun';
-const SYNC_TS_KEY = 'marathon-strava-lastrun-synced';
+// Device-local throttle timestamp, scoped per user (legacy key left untouched).
+const SYNC_TS_KEY = () => `stride:${getCurrentUserId()}:strava-lastrun-synced`;
 const THROTTLE_MS = 15 * 60 * 1000;
 
 interface LastRunResponse {
@@ -61,7 +63,7 @@ export function useLastRun(connected: boolean | null) {
         await storage.set(CACHE_KEY, JSON.stringify(data));
         window.dispatchEvent(new CustomEvent(STORAGE_UPDATED_EVENT, { detail: { key: CACHE_KEY } }));
       }
-      try { localStorage.setItem(SYNC_TS_KEY, String(Date.now())); } catch {}
+      try { localStorage.setItem(SYNC_TS_KEY(), String(Date.now())); } catch {}
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -72,7 +74,7 @@ export function useLastRun(connected: boolean | null) {
   useEffect(() => {
     if (connected !== true) return;
     let lastSync = 0;
-    try { lastSync = Number(localStorage.getItem(SYNC_TS_KEY) ?? 0); } catch {}
+    try { lastSync = Number(localStorage.getItem(SYNC_TS_KEY()) ?? 0); } catch {}
     if (Date.now() - lastSync > THROTTLE_MS) {
       refresh().catch(() => {});
     }

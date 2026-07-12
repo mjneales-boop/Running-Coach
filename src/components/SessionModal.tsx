@@ -7,6 +7,7 @@ import { StrengthLinkCard } from './daily/StrengthLinkCard';
 import { PaceProgressionChart } from './progress/PaceProgressionChart';
 import { guideEntriesForDay } from '../lib/coaching';
 import { estimateDuration, zoneForPace } from '../lib/logic';
+import { usePlanConfig } from '../hooks/usePlanConfig';
 import { SESSION_TYPE_LABEL } from '../lib/coachNotes';
 import { WORKOUTS } from '../constants/workouts';
 import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, StravaActivity } from '../types';
@@ -44,6 +45,7 @@ export function SessionModal({
   onRemoveGym,
   onNavigateToStrength,
 }: SessionModalProps) {
+  const { zones } = usePlanConfig();
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
   const entry = completion[sessionKey] ?? { done: false };
@@ -72,7 +74,7 @@ export function SessionModal({
     weekday: 'short', month: 'short', day: 'numeric',
   });
   const guides = guideEntriesForDay(day);
-  const zone = zoneForPace(day.pace);
+  const zone = zoneForPace(day.pace, zones);
   const duration = estimateDuration(day);
 
   return (

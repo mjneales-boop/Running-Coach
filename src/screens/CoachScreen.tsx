@@ -5,11 +5,13 @@ import { QuickPromptChips } from '../components/coach/QuickPromptChips';
 import { ChatInput } from '../components/coach/ChatInput';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan } from '../hooks/usePlan';
+import { usePlanConfig } from '../hooks/usePlanConfig';
 import { useCompletion } from '../hooks/useCompletion';
 import { useReadiness } from '../hooks/useReadiness';
 import { useCoachMessages } from '../hooks/useCoachMessages';
 import { useStorage } from '../hooks/useStorage';
 import { buildCoachContext, coachGreeting } from '../lib/coachContext';
+import { supabase } from '../lib/supabase';
 import type { CoachMessage, StravaActivity } from '../types';
 
 const QUICK_PROMPTS = ["Pace Saturday's long run?", 'Swap Tuesday?', 'How did my last run look?'];
@@ -22,6 +24,7 @@ interface CoachScreenProps {
 export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
   const today = useCurrentDate();
   const { currentWeek, currentPhase } = usePlan(today, 0);
+  const plan = usePlanConfig();
   const { completion } = useCompletion();
   const { latestEntry } = useReadiness();
   const { messages, setMessages } = useCoachMessages();
@@ -39,10 +42,15 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
   async function send(history: CoachMessage[]) {
     setThinking(true);
     try {
-      const context = buildCoachContext(today, completion, latestEntry, stravaActivities);
+      const context = buildCoachContext(today, completion, latestEntry, stravaActivities, plan);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const r = await fetch('/api/coach-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ context, messages: history }),
       });
       const data = (await r.json()) as { reply?: string; error?: string };
@@ -85,7 +93,7 @@ export function CoachScreen({ activeTab, onTabChange }: CoachScreenProps) {
       </div>
 
       <div ref={transcriptRef} className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-[22px] pb-2 pt-5">
-        {messages.length === 0 && !thinking && <MessageBubble role="assistant" content={coachGreeting(today)} />}
+        {messages.length === 0 && !thinking && <MessageBubble role="assistant" content={coachGreeting(today, plan)} />}
         {messages.map((m, i) => (
           <MessageBubble key={i} role={m.role} content={m.content} />
         ))}
