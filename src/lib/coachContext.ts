@@ -36,6 +36,10 @@ function guideSummary(day: Day, guide: Record<string, GuideEntry>): GuideSummary
 }
 
 export interface CoachContext {
+  /** Today's date (local), so the coach can anchor "today"/"yesterday"/recency —
+   *  the only temporal anchor in general mode, where there's no race countdown. */
+  todayDate: string;    // YYYY-MM-DD
+  todayWeekday: string; // e.g. 'Monday'
   /** null in general-fitness mode — the athlete is not training for a race. */
   race: { name: string; date: string; goalTime: string; goalPace: string } | null;
   mode: string;
@@ -68,8 +72,9 @@ export interface CoachContext {
     | null;
   /** Today plus the next ~9 days of the plan, spanning into next week if needed — lets the coach answer "what's tomorrow / this weekend / next week" questions. Only the near-term entries (first ~4) carry full `guide` detail, to bound context size. */
   upcoming: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string; guide?: GuideSummary[] }[];
-  /** Actual logged runs from Strava, most recent first — real pace/HR/distance, not just the plan. */
-  recentRuns: { date: string; distanceKm: number; avgPaceMinKm: number; avgHR?: number }[];
+  /** Actual logged runs from Strava, most recent first — real pace/HR/distance, not just the plan.
+   *  `daysAgo` is relative to `today` (0 = today, 1 = yesterday) so the coach can judge recency. */
+  recentRuns: { date: string; daysAgo: number; distanceKm: number; avgPaceMinKm: number; avgHR?: number }[];
   /** Completed km per week for the last few weeks (oldest first) plus this week — use for volume-trend questions ("how has my training been going the last few weeks"). */
   recentWeeks: { label: string; kmDone: number; targetKm: number }[];
   stravaConnected: boolean;
@@ -77,6 +82,18 @@ export interface CoachContext {
 
 function weekdayShort(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Whole calendar days between a YYYY-MM-DD run date and today (0 = today, 1 = yesterday). */
+function daysAgoFrom(today: Date, dateStr: string): number {
+  const t = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const d = new Date(`${dateStr}T00:00:00`);
+  const dd = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((t - dd) / 86_400_000);
 }
 
 function upcomingDays(today: Date, weeks: Week[], guide: Record<string, GuideEntry>, count = 10, guideDepth = 4) {
@@ -118,6 +135,8 @@ export function buildCoachContext(
 
   const isRace = plan.isRace;
   return {
+    todayDate: localDateStr(today),
+    todayWeekday: today.toLocaleDateString('en-US', { weekday: 'long' }),
     race: isRace
       ? { name: race.name, date: race.date, goalTime: race.goalTime, goalPace: race.goalPace }
       : null,
@@ -155,6 +174,7 @@ export function buildCoachContext(
     upcoming: upcomingDays(today, weeks, plan.sessionGuide),
     recentRuns: activities.slice(0, 10).map((a) => ({
       date: a.date,
+      daysAgo: daysAgoFrom(today, a.date),
       distanceKm: a.distanceKm,
       avgPaceMinKm: a.avgPaceMinKm,
       avgHR: a.avgHR,
