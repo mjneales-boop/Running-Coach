@@ -48,6 +48,16 @@ export interface LegacyImportResult {
 export async function runLegacyImport(): Promise<LegacyImportResult> {
   const result: LegacyImportResult = { readiness: 0, stravaActivities: 0, blobs: [] };
 
+  // The legacy `marathon-*` keys are the OWNER's personal history, living in this
+  // device's browser storage. Only import them into the owner's own account —
+  // never into some other account that happens to log in on the owner's device
+  // (otherwise every test/guest account inherits the owner's runs & readiness).
+  const profile = await db.fetchProfile();
+  if (!profile?.is_admin) {
+    try { localStorage.setItem(FLAG(), new Date().toISOString()); } catch { /* retry-safe */ }
+    return result;
+  }
+
   const readiness = readLegacy<Record<string, ReadinessEntry>>('marathon-readiness');
   if (readiness && Object.keys(readiness).length) {
     const remote = await db.fetchReadinessMap();
