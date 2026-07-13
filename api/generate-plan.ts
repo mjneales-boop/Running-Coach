@@ -105,7 +105,10 @@ function stripFences(text: string): string {
 
 async function generateOnce(system: string, messages: Anthropic.MessageParam[]): Promise<string> {
   const stream = anthropic.messages.stream({
-    model: 'claude-opus-4-8',
+    // Sonnet 5 (not the coach's Opus): a full 18-week plan is ~15k tokens of
+    // JSON, which Opus streams for 4+ minutes — past the function limit once a
+    // validation retry is needed. Sonnet generates it in ~1 minute.
+    model: 'claude-sonnet-5',
     max_tokens: 64000,
     thinking: { type: 'adaptive' },
     system,
