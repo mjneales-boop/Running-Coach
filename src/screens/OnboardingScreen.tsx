@@ -109,7 +109,11 @@ export function OnboardingScreen() {
       if (!r.ok || !data.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
       window.location.reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong — please try again.');
+      const msg =
+        e instanceof Error
+          ? e.message
+          : (e as { message?: string })?.message ?? 'Something went wrong — please try again.';
+      setError(msg);
       setGenerating(false);
     }
   }

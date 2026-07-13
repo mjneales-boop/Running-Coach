@@ -2,6 +2,7 @@
 // user_id columns default to auth.uid() server-side, so it is never sent.
 
 import { supabase } from './supabase';
+import { getCurrentUserId } from '../hooks/useAuth';
 import type {
   CompletionEntry,
   DayAbbr,
@@ -204,7 +205,13 @@ export interface ProfilePatch {
 }
 
 export async function updateProfile(patch: ProfilePatch): Promise<void> {
-  const { data, error } = await supabase.from('profiles').update(patch).select('id');
+  // Explicit WHERE: the project rejects unfiltered UPDATEs (RLS scoping alone
+  // is not enough — Postgres error 21000).
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('id', getCurrentUserId())
+    .select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('profile update matched no row');
 }
