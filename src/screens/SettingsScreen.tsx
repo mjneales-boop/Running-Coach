@@ -133,7 +133,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const oura = useOura();
   const strava = useStrava();
   const { settings, update } = useSettings();
-  const { weeks, race, athlete } = usePlanConfig();
+  const { weeks, race, athlete, mode } = usePlanConfig();
   const { session, signOut } = useAuth();
 
   const planWeeks = weeks.filter((w) => w.phase !== 0).length;
@@ -197,15 +197,26 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         />
       </SettingsSection>
 
-      <SettingsSection title="Marathon plan">
-        <SettingsRow label="Goal race" value={<span className="font-semibold text-muted">{raceShortName(race.name)}</span>} />
-        <SettingsRow label="Race date" value={<span className="font-semibold text-muted">{formatRaceDateEU(race.date)}</span>} />
-        <SettingsRow
-          label="Time goal"
-          value={<span className="font-bold text-accent">Sub-{formatGoalTime(race.goalTime)} · MP {race.goalPace}</span>}
-        />
-        <SettingsRow label="Plan length" value={<span className="font-semibold text-muted">{planWeeks} weeks · base → race</span>} />
-      </SettingsSection>
+      {mode === 'general' ? (
+        <SettingsSection title="Training plan">
+          <SettingsRow label="Goal" value={<span className="font-semibold text-muted">General fitness</span>} />
+          <SettingsRow
+            label="Target pace"
+            value={<span className="font-bold text-accent">{race.goalPace || '—'} /km</span>}
+          />
+          <SettingsRow label="Plan length" value={<span className="font-semibold text-muted">{planWeeks} weeks · rolling blocks</span>} />
+        </SettingsSection>
+      ) : (
+        <SettingsSection title="Marathon plan">
+          <SettingsRow label="Goal race" value={<span className="font-semibold text-muted">{raceShortName(race.name)}</span>} />
+          <SettingsRow label="Race date" value={<span className="font-semibold text-muted">{formatRaceDateEU(race.date)}</span>} />
+          <SettingsRow
+            label="Time goal"
+            value={<span className="font-bold text-accent">Sub-{formatGoalTime(race.goalTime)} · MP {race.goalPace}</span>}
+          />
+          <SettingsRow label="Plan length" value={<span className="font-semibold text-muted">{planWeeks} weeks · base → race</span>} />
+        </SettingsSection>
+      )}
 
       <SettingsSection title="Body">
         <div className="flex items-center justify-between gap-3.5 py-[14px]">

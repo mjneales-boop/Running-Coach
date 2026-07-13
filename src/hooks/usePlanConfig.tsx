@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { fetchActivePlan, fetchProfile } from '../lib/db';
+import { buildSessionGuide, type GuideEntry } from '../lib/sessionGuides';
+import { OnboardingScreen } from '../screens/OnboardingScreen';
 import type { PhaseInfo, Week, Zone } from '../types';
 
 export interface RaceConfig {
@@ -27,6 +29,9 @@ export interface PlanConfig {
   peakKm: number;
   race: RaceConfig;
   athlete: AthleteConfig;
+  injuryHistory: string;
+  /** Session guides templated with this athlete's zones/goal/injury notes. */
+  sessionGuide: Record<string, GuideEntry>;
   isAdmin: boolean;
 }
 
@@ -42,21 +47,6 @@ function Splash() {
   );
 }
 
-function NoPlanPanel() {
-  return (
-    <div className="flex min-h-dvh items-center justify-center px-5">
-      <div className="stride-rise w-full max-w-sm rounded-card border border-hairline bg-surface p-6 text-center">
-        <div className="font-display text-lg font-black uppercase tracking-[0.14em] text-ink">
-          No plan yet
-        </div>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          Your account is set up, but there's no training plan attached to it yet. Personalized
-          plan generation is coming soon — sit tight.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function PlanProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{ plan: PlanConfig | null; loading: boolean }>({
@@ -73,6 +63,14 @@ export function PlanProvider({ children }: { children: ReactNode }) {
           setState({ plan: null, loading: false });
           return;
         }
+        const race = {
+          name: profile.race_name ?? '',
+          date: profile.race_date ?? '',
+          time: profile.race_time ?? '08:00',
+          location: profile.race_location ?? '',
+          goalTime: profile.goal_time ?? '',
+          goalPace: profile.goal_pace ?? '',
+        };
         setState({
           loading: false,
           plan: {
@@ -81,14 +79,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
             zones: plan.zones,
             phases: plan.phases,
             peakKm: Math.max(...plan.weeks.map((w) => w.targetKm)),
-            race: {
-              name: profile.race_name ?? '',
-              date: profile.race_date ?? '',
-              time: profile.race_time ?? '08:00',
-              location: profile.race_location ?? '',
-              goalTime: profile.goal_time ?? '',
-              goalPace: profile.goal_pace ?? '',
-            },
+            race,
             athlete: {
               name: profile.display_name ?? '',
               maxHR: Number(profile.max_hr ?? 0),
@@ -96,6 +87,14 @@ export function PlanProvider({ children }: { children: ReactNode }) {
               baselineRHR: Number(profile.baseline_rhr ?? 0),
               baselineSleep: Number(profile.baseline_sleep ?? 0),
             },
+            injuryHistory: profile.injury_history ?? '',
+            sessionGuide: buildSessionGuide({
+              zones: plan.zones,
+              goalPace: race.goalPace || undefined,
+              goalTime: race.goalTime || undefined,
+              raceStart: race.time || undefined,
+              injuryHistory: profile.injury_history ?? undefined,
+            }),
             isAdmin: profile.is_admin,
           },
         });
@@ -109,7 +108,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (state.loading) return <Splash />;
-  if (!state.plan) return <NoPlanPanel />;
+  if (!state.plan) return <OnboardingScreen />;
   return <PlanContext.Provider value={state.plan}>{children}</PlanContext.Provider>;
 }
 

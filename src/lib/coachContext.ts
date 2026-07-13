@@ -12,6 +12,7 @@ import {
   buildProgressStats,
 } from './logic';
 import { guideEntriesForDay } from './coaching';
+import type { GuideEntry } from './sessionGuides';
 import type { CompletionEntry, Day, ReadinessEntry, StravaActivity, Week } from '../types';
 
 interface GuideSummary {
@@ -23,8 +24,8 @@ interface GuideSummary {
   mistake: string;
 }
 
-function guideSummary(day: Day): GuideSummary[] {
-  return guideEntriesForDay(day).map(({ label, what, why, feel, execute, mistake }) => ({
+function guideSummary(day: Day, guide: Record<string, GuideEntry>): GuideSummary[] {
+  return guideEntriesForDay(day, guide).map(({ label, what, why, feel, execute, mistake }) => ({
     label,
     what,
     why,
@@ -35,8 +36,12 @@ function guideSummary(day: Day): GuideSummary[] {
 }
 
 export interface CoachContext {
-  race: { name: string; date: string; goalTime: string; goalPace: string };
-  week: { num: string; phase: string; daysOut: number; targetKm: number; doneKm: number };
+  /** null in general-fitness mode — the athlete is not training for a race. */
+  race: { name: string; date: string; goalTime: string; goalPace: string } | null;
+  mode: string;
+  /** goal pace anchoring the zones (race pace, or a target pace in general mode). */
+  goalPace: string;
+  week: { num: string; phase: string; daysOut: number | null; targetKm: number; doneKm: number };
   readiness: {
     score?: number;
     headline: string;
@@ -74,7 +79,7 @@ function weekdayShort(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-function upcomingDays(today: Date, weeks: Week[], count = 10, guideDepth = 4) {
+function upcomingDays(today: Date, weeks: Week[], guide: Record<string, GuideEntry>, count = 10, guideDepth = 4) {
   const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   return weeks.flatMap((w) => w.days)
     .filter((d) => d.date >= t)
@@ -86,7 +91,7 @@ function upcomingDays(today: Date, weeks: Week[], count = 10, guideDepth = 4) {
       title: d.title,
       km: d.km,
       pace: d.pace,
-      ...(i < guideDepth ? { guide: guideSummary(d) } : {}),
+      ...(i < guideDepth ? { guide: guideSummary(d, guide) } : {}),
     }));
 }
 
@@ -111,9 +116,20 @@ export function buildCoachContext(
     .slice(-4)
     .map((v) => ({ label: v.label, kmDone: v.km, targetKm: weeks.find((w) => w.id === v.weekId)!.targetKm }));
 
+  const isRace = plan.mode !== 'general' && !!race.date;
   return {
-    race: { name: race.name, date: race.date, goalTime: race.goalTime, goalPace: race.goalPace },
-    week: { num: week.num, phase: phase.name, daysOut: daysToRace(today, race), targetKm: week.targetKm, doneKm: weeklyKmDone(week, completion) },
+    race: isRace
+      ? { name: race.name, date: race.date, goalTime: race.goalTime, goalPace: race.goalPace }
+      : null,
+    mode: plan.mode,
+    goalPace: race.goalPace,
+    week: {
+      num: week.num,
+      phase: phase.name,
+      daysOut: isRace ? daysToRace(today, race) : null,
+      targetKm: week.targetKm,
+      doneKm: weeklyKmDone(week, completion),
+    },
     readiness: {
       score: r.score,
       headline,
@@ -132,11 +148,11 @@ export function buildCoachContext(
           km: todaySession.km,
           pace: todaySession.pace,
           notes: todaySession.notes,
-          guide: guideSummary(todaySession),
+          guide: guideSummary(todaySession, plan.sessionGuide),
           readinessAdjustment: readinessAdjustment(r.score),
         }
       : null,
-    upcoming: upcomingDays(today, weeks),
+    upcoming: upcomingDays(today, weeks, plan.sessionGuide),
     recentRuns: activities.slice(0, 10).map((a) => ({
       date: a.date,
       distanceKm: a.distanceKm,
@@ -166,6 +182,11 @@ function weekStatusLine(week: Week): string {
 export function coachGreeting(today: Date, plan: PlanConfig): string {
   const week = findCurrentWeek(today, plan.weeks);
   const phase = currentPhase(week, plan.phases);
+  if (plan.mode === 'general' || !plan.race.date) {
+    return `${timeOfDayGreeting(today)}. Week ${week.num} of your block, ${phase.short.toLowerCase()} work — ${weekStatusLine(
+      week,
+    )}. Ask me about today, your paces, or the week ahead.`;
+  }
   const daysOut = daysToRace(today, plan.race);
   return `${timeOfDayGreeting(today)}. You're ${daysOut} days out, week ${week.num} of ${phase.short.toLowerCase()} — ${weekStatusLine(
     week,

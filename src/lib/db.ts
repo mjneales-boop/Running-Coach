@@ -168,6 +168,8 @@ export interface ProfileRow {
   baseline_rhr: number | null;
   baseline_sleep: number | null;
   max_hr: number | null;
+  injury_history: string | null;
+  include_strength: boolean | null;
   is_admin: boolean;
 }
 
@@ -175,9 +177,34 @@ export async function fetchProfile(): Promise<ProfileRow | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, display_name, race_name, race_date, race_time, race_location, goal_time, goal_pace, baseline_hrv, baseline_rhr, baseline_sleep, max_hr, is_admin',
+      'id, display_name, race_name, race_date, race_time, race_location, goal_time, goal_pace, baseline_hrv, baseline_rhr, baseline_sleep, max_hr, injury_history, include_strength, is_admin',
     )
     .maybeSingle();
   if (error) throw error;
   return data as ProfileRow | null;
+}
+
+export interface ProfilePatch {
+  display_name?: string;
+  weight_kg?: number | null;
+  height_cm?: number | null;
+  sex?: string | null;
+  experience?: string | null;
+  weekly_km_current?: number | null;
+  days_per_week?: number | null;
+  injury_history?: string | null;
+  recent_race_times?: { distance: string; time: string }[] | null;
+  include_strength?: boolean;
+  race_name?: string | null;
+  race_date?: string | null;
+  race_time?: string | null;
+  race_location?: string | null;
+  goal_time?: string | null;
+  goal_pace?: string | null;
+}
+
+export async function updateProfile(patch: ProfilePatch): Promise<void> {
+  const { data, error } = await supabase.from('profiles').update(patch).select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('profile update matched no row');
 }

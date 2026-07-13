@@ -1,45 +1,46 @@
-import { SESSION_GUIDE } from '../constants/coaching';
-import type { GuideEntry } from '../constants/coaching';
+import type { GuideEntry } from './sessionGuides';
 import type { Day, Week } from '../types';
 
-export function guideEntriesForDay(day: Day): GuideEntry[] {
+export function guideEntriesForDay(day: Day, guide: Record<string, GuideEntry>): GuideEntry[] {
   const entries: GuideEntry[] = [];
 
   switch (day.type) {
     case 'LONG': {
       const text = day.title + ' ' + (day.notes ?? '');
-      if (/fasted/i.test(text)) entries.push(SESSION_GUIDE.fasted);
-      else if (/5:41|MP/.test(day.pace ?? '') || /MP/.test(day.title)) entries.push(SESSION_GUIDE.longMP);
-      else entries.push(SESSION_GUIDE.long);
+      if (/fasted/i.test(text)) entries.push(guide.fasted);
+      else if (/5:41|MP/.test(day.pace ?? '') || /MP/.test(day.title)) entries.push(guide.longMP);
+      else entries.push(guide.long);
       break;
     }
     case 'EASY':
-      entries.push(SESSION_GUIDE.easy);
+      entries.push(guide.easy);
       break;
     case 'BIKE':
-      entries.push(SESSION_GUIDE.bike);
+      entries.push(guide.bike);
       break;
     case 'REST':
-      entries.push(SESSION_GUIDE.rest);
+      entries.push(guide.rest);
       break;
     case 'RACE':
-      entries.push(SESSION_GUIDE.race);
+      entries.push(guide.race);
       break;
     case 'WORKOUT': {
       const text = day.title + ' ' + (day.notes ?? '');
-      if (/steady/i.test(text)) entries.push(SESSION_GUIDE.steady);
-      else if (/4:55|threshold|\bT\b/i.test(text)) entries.push(SESSION_GUIDE.threshold);
-      else if (/5:10|sub-?t/i.test(text)) entries.push(SESSION_GUIDE.subThreshold);
-      else if (/CV|4:2[5-9]|4:3[0-5]/i.test(text)) entries.push(SESSION_GUIDE.vo2);
-      else entries.push(SESSION_GUIDE.subThreshold);
+      // Sub-T is checked before threshold: "sub-threshold"/"Sub-T" titles also
+      // match the broader threshold patterns ("threshold", \bT\b).
+      if (/steady/i.test(text)) entries.push(guide.steady);
+      else if (/5:10|sub-?t/i.test(text)) entries.push(guide.subThreshold);
+      else if (/4:55|threshold|\bT\b/i.test(text)) entries.push(guide.threshold);
+      else if (/CV|vo2|4:2[5-9]|4:3[0-5]/i.test(text)) entries.push(guide.vo2);
+      else entries.push(guide.subThreshold);
       break;
     }
   }
 
-  if (day.strides) entries.push(SESSION_GUIDE.strides);
-  if (/hill sprint/i.test(day.title + ' ' + (day.notes ?? ''))) entries.push(SESSION_GUIDE.hillSprints);
+  if (day.strides) entries.push(guide.strides);
+  if (/hill sprint/i.test(day.title + ' ' + (day.notes ?? ''))) entries.push(guide.hillSprints);
 
-  return entries;
+  return entries.filter(Boolean);
 }
 
 export interface WorkoutPacePoint {

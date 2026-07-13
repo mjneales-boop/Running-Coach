@@ -45,7 +45,7 @@ export function SessionModal({
   onRemoveGym,
   onNavigateToStrength,
 }: SessionModalProps) {
-  const { zones } = usePlanConfig();
+  const { zones, sessionGuide } = usePlanConfig();
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
   const sessionKey = `${weekId}-${dayAbbr}`;
   const entry = completion[sessionKey] ?? { done: false };
@@ -73,7 +73,7 @@ export function SessionModal({
   const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   });
-  const guides = guideEntriesForDay(day);
+  const guides = guideEntriesForDay(day, sessionGuide);
   const zone = zoneForPace(day.pace, zones);
   const duration = estimateDuration(day);
 

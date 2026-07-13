@@ -18,6 +18,7 @@ import { GymScheduleProvider, useGymSchedule } from './hooks/useGymSchedule';
 import { OuraProvider, useOura } from './hooks/useOura';
 import { StravaProvider, useStrava } from './hooks/useStrava';
 import { useAutoSync } from './hooks/useAutoSync';
+import { useBlockExtension } from './hooks/useBlockExtension';
 import { usePlan } from './hooks/usePlan';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { PlanProvider } from './hooks/usePlanConfig';
@@ -91,6 +92,7 @@ function AppShell() {
   const oura = useOura();
   const strava = useStrava();
   useAutoSync(oura, strava);
+  useBlockExtension(today);
 
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
