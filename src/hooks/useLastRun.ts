@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
+import { authFetch } from '../lib/authFetch';
 import { getCurrentUserId } from './useAuth';
 import type { StravaRunDetail } from '../types';
 
@@ -47,7 +48,7 @@ export function useLastRun(connected: boolean | null) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/strava/sync?mode=last-run');
+      const res = await authFetch('/api/strava/sync?mode=last-run');
       if (!res.ok) {
         let msg = `HTTP ${res.status}`;
         try {

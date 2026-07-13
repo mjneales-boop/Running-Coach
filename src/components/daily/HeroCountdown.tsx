@@ -23,9 +23,9 @@ interface HeroCountdownProps {
 }
 
 export function HeroCountdown({ daysToRace, week, phase }: HeroCountdownProps) {
-  const { race, mode, weeks } = usePlanConfig();
+  const { race, isRace, weeks } = usePlanConfig();
 
-  if (mode === 'general' || !race.date) {
+  if (!isRace) {
     // No race to count down to — show block progress in the same visual frame.
     const weekIndex = Math.max(0, weeks.findIndex((w) => w.id === week.id)) + 1;
     return (

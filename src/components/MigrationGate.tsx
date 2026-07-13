@@ -37,7 +37,12 @@ export function MigrationGate({ children }: { children: ReactNode }) {
   return (
     <>
       {confirmation && (
-        <div className="fixed inset-x-4 top-4 z-50 flex items-center justify-between gap-3 rounded-xl border border-hairline-strong bg-surface-2 px-4 py-3 shadow-lg">
+        <div
+          className="fixed inset-x-4 z-50 flex items-center justify-between gap-3 rounded-xl border border-hairline-strong bg-surface-2 px-4 py-3 shadow-lg"
+          // Sit clear of the iOS status bar / notch so the OK button is tappable
+          // (top-4 alone put it under the safe area on installed PWAs).
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
+        >
           <span className="text-[13px] leading-snug text-ink">
             History imported — {confirmation.readiness} readiness days,{' '}
             {confirmation.stravaActivities} Strava runs. Your original data stays on this device.
@@ -45,7 +50,7 @@ export function MigrationGate({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => setConfirmation(null)}
-            className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent"
+            className="-my-3 -mr-2 flex-none px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-accent"
           >
             OK
           </button>

@@ -133,7 +133,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const oura = useOura();
   const strava = useStrava();
   const { settings, update } = useSettings();
-  const { weeks, race, athlete, mode } = usePlanConfig();
+  const { weeks, race, athlete, isRace } = usePlanConfig();
   const { session, signOut } = useAuth();
 
   const planWeeks = weeks.filter((w) => w.phase !== 0).length;
@@ -197,7 +197,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         />
       </SettingsSection>
 
-      {mode === 'general' ? (
+      {!isRace ? (
         <SettingsSection title="Training plan">
           <SettingsRow label="Goal" value={<span className="font-semibold text-muted">General fitness</span>} />
           <SettingsRow

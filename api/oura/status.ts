@@ -1,9 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getIronSession } from 'iron-session';
-import { sessionOptions, type OuraSession } from '../../lib/session.js';
+import { verifyUser } from '../../lib/verifyUser.js';
+import { getConnection } from '../../lib/tokenStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const session = await getIronSession<OuraSession>(req, res, sessionOptions);
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ connected: !!session.accessToken });
+  const user = await verifyUser(req);
+  if (!user) return res.json({ connected: false });
+  const conn = await getConnection(user.id, 'oura');
+  res.json({ connected: !!conn });
 }

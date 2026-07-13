@@ -29,6 +29,11 @@ export default defineConfig({
         // App-shell caching only — /api/* (Strava, Oura, coach chat, strength) is always live.
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Take over immediately on update and drop old precaches, so an installed
+        // PWA can never keep serving a stale bundle across a deploy.
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

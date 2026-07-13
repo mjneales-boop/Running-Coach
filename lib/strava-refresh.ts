@@ -1,45 +1,41 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getIronSession } from 'iron-session';
-import { stravaSessionOptions, type StravaSession } from './session.js';
+import { getConnection, saveConnection, deleteConnection } from './tokenStore.js';
 
-export async function ensureValidStravaToken(
-  req: VercelRequest,
-  res: VercelResponse,
-): Promise<string | null> {
-  const session = await getIronSession<StravaSession>(req, res, stravaSessionOptions);
+/** Returns a valid Strava access token for the user, refreshing (and
+ *  re-persisting) if it expires within 60s. Deletes the connection and returns
+ *  null if the refresh fails or the user has no connection. */
+export async function ensureValidStravaToken(uid: string): Promise<string | null> {
+  const conn = await getConnection(uid, 'strava');
+  if (!conn) return null;
 
-  if (!session.accessToken) return null;
+  const nowSec = Date.now() / 1000;
+  if (conn.expiresAt - nowSec >= 60) return conn.accessToken;
 
-  const expiresAt = session.expiresAt ?? 0;
-  // expiresAt is in seconds; Date.now() is ms — divide to compare in seconds
-  if (expiresAt - Date.now() / 1000 < 60 && session.refreshToken) {
-    const refreshRes = await fetch('https://www.strava.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: session.refreshToken,
-        client_id: process.env.STRAVA_CLIENT_ID!,
-        client_secret: process.env.STRAVA_CLIENT_SECRET!,
-      }),
-    });
+  const refreshRes = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: conn.refreshToken,
+      client_id: process.env.STRAVA_CLIENT_ID!,
+      client_secret: process.env.STRAVA_CLIENT_SECRET!,
+    }),
+  });
 
-    if (!refreshRes.ok) {
-      session.destroy();
-      return null;
-    }
-
-    const { access_token, refresh_token, expires_at } = (await refreshRes.json()) as {
-      access_token: string;
-      refresh_token: string;
-      expires_at: number; // Strava returns Unix seconds directly
-    };
-
-    session.accessToken = access_token;
-    session.refreshToken = refresh_token;
-    session.expiresAt = expires_at; // already in seconds — do NOT multiply by 1000
-    await session.save();
+  if (!refreshRes.ok) {
+    await deleteConnection(uid, 'strava');
+    return null;
   }
 
-  return session.accessToken ?? null;
+  const { access_token, refresh_token, expires_at } = (await refreshRes.json()) as {
+    access_token: string;
+    refresh_token: string;
+    expires_at: number; // Strava returns Unix seconds directly
+  };
+
+  await saveConnection(uid, 'strava', {
+    accessToken: access_token,
+    refreshToken: refresh_token,
+    expiresAt: expires_at,
+  });
+  return access_token;
 }

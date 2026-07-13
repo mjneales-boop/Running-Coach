@@ -116,7 +116,7 @@ export function buildCoachContext(
     .slice(-4)
     .map((v) => ({ label: v.label, kmDone: v.km, targetKm: weeks.find((w) => w.id === v.weekId)!.targetKm }));
 
-  const isRace = plan.mode !== 'general' && !!race.date;
+  const isRace = plan.isRace;
   return {
     race: isRace
       ? { name: race.name, date: race.date, goalTime: race.goalTime, goalPace: race.goalPace }
@@ -182,7 +182,7 @@ function weekStatusLine(week: Week): string {
 export function coachGreeting(today: Date, plan: PlanConfig): string {
   const week = findCurrentWeek(today, plan.weeks);
   const phase = currentPhase(week, plan.phases);
-  if (plan.mode === 'general' || !plan.race.date) {
+  if (!plan.isRace) {
     return `${timeOfDayGreeting(today)}. Week ${week.num} of your block, ${phase.short.toLowerCase()} work — ${weekStatusLine(
       week,
     )}. Ask me about today, your paces, or the week ahead.`;

@@ -1,15 +1,22 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getIronSession } from 'iron-session';
-import { stravaSessionOptions, type StravaSession } from '../../lib/session.js';
+import { verifyUser } from '../../lib/verifyUser.js';
+import { getConnection, deleteConnection } from '../../lib/tokenStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const session = await getIronSession<StravaSession>(req, res, stravaSessionOptions);
+  const user = await verifyUser(req);
+  if (!user) {
+    if (req.method === 'POST') return res.status(401).json({ error: 'Unauthorized' });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ connected: false });
+  }
 
+  // POST = disconnect (this user only).
   if (req.method === 'POST') {
-    session.destroy();
+    await deleteConnection(user.id, 'strava');
     return res.json({ ok: true });
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ connected: !!session.accessToken });
+  const conn = await getConnection(user.id, 'strava');
+  res.json({ connected: !!conn });
 }

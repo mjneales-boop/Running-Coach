@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ensureValidToken } from '../../lib/oura-refresh.js';
+import { verifyUser } from '../../lib/verifyUser.js';
 
 interface DailyReadinessDoc {
   day: string;
@@ -20,7 +21,9 @@ interface OuraCollectionResponse<T> {
 type ReadinessEntry = { score?: number; hrv?: number; rhr?: number; sleep?: number };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const token = await ensureValidToken(req, res);
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  const token = await ensureValidToken(user.id);
   if (!token) return res.status(401).json({ error: 'Not connected' });
 
   const days = Math.min(90, Math.max(1, Number(req.query.days ?? 30)));

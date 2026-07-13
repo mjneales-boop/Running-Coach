@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getIronSession } from 'iron-session';
-import { stravaSessionOptions, type StravaSession } from '../../lib/session.js';
+import { verifyState } from '../../lib/oauthState.js';
+import { saveConnection } from '../../lib/tokenStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code, state, error } = req.query;
@@ -9,9 +9,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.redirect(`/?strava_error=${encodeURIComponent(String(error))}`);
   }
 
-  // CSRF state check
-  const cookieState = req.cookies['strava-state'];
-  if (!state || state !== cookieState) {
+  // Signed state carries + authenticates the connecting user's id (CSRF guard).
+  const uid = typeof state === 'string' ? verifyState(state, 'strava') : null;
+  if (!uid) {
     return res.status(400).send('Invalid state parameter');
   }
 
@@ -42,23 +42,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     expires_at: number; // Strava returns Unix seconds — do NOT multiply by 1000
   };
 
-  const session = await getIronSession<StravaSession>(req, res, stravaSessionOptions);
-  session.accessToken = access_token;
-  session.refreshToken = refresh_token;
-  session.expiresAt = expires_at;
-  await session.save();
-
-  // Clear state cookie without clobbering the iron-session cookie
-  const existing = res.getHeader('Set-Cookie');
-  const existingArr = Array.isArray(existing)
-    ? existing
-    : existing != null
-      ? [String(existing)]
-      : [];
-  res.setHeader('Set-Cookie', [
-    ...existingArr,
-    'strava-state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax',
-  ]);
+  await saveConnection(uid, 'strava', {
+    accessToken: access_token,
+    refreshToken: refresh_token,
+    expiresAt: expires_at,
+  });
 
   res.redirect('/?strava_connected=1');
 }

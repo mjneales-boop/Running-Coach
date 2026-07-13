@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
+import { authFetch } from '../lib/authFetch';
 import type { ReadinessEntry } from '../types';
 
 type ReadinessMap = Record<string, ReadinessEntry>;
@@ -35,7 +36,7 @@ export function OuraProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check connection status on mount
-    fetch('/api/oura/status')
+    authFetch('/api/oura/status')
       .then((r) => r.json())
       .then(({ connected: c }: { connected: boolean }) => setConnected(c))
       .catch(() => setConnected(false));
@@ -57,7 +58,7 @@ export function OuraProvider({ children }: { children: ReactNode }) {
     setLastError(null);
 
     try {
-      const res = await fetch(`/api/oura/sync?days=${days}`);
+      const res = await authFetch(`/api/oura/sync?days=${days}`);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
@@ -95,12 +96,19 @@ export function OuraProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const connect = useCallback(() => {
-    window.location.href = '/api/oura/authorize';
+  const connect = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/oura/authorize');
+      const { url } = (await res.json()) as { url?: string };
+      if (url) window.location.href = url;
+      else setLastError('Could not start Oura connection');
+    } catch {
+      setLastError('Could not start Oura connection');
+    }
   }, []);
 
   const disconnect = useCallback(async () => {
-    await fetch('/api/oura/disconnect', { method: 'POST' });
+    await authFetch('/api/oura/disconnect', { method: 'POST' });
     setConnected(false);
     setLastSynced(null);
   }, []);

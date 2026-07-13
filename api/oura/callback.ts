@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getIronSession } from 'iron-session';
-import { sessionOptions, type OuraSession } from '../../lib/session.js';
+import { verifyState } from '../../lib/oauthState.js';
+import { saveConnection } from '../../lib/tokenStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code, state, error } = req.query;
@@ -9,9 +9,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.redirect(`/?oura_error=${encodeURIComponent(String(error))}`);
   }
 
-  // CSRF state check
-  const cookieState = req.cookies['oura-state'];
-  if (!state || state !== cookieState) {
+  // Signed state carries + authenticates the connecting user's id (CSRF guard).
+  const uid = typeof state === 'string' ? verifyState(state, 'oura') : null;
+  if (!uid) {
     return res.status(400).send('Invalid state parameter');
   }
 
@@ -39,26 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { access_token, refresh_token, expires_in } = (await tokenRes.json()) as {
     access_token: string;
     refresh_token: string;
-    expires_in: number;
+    expires_in: number; // seconds until expiry
   };
 
-  const session = await getIronSession<OuraSession>(req, res, sessionOptions);
-  session.accessToken = access_token;
-  session.refreshToken = refresh_token;
-  session.expiresAt = Date.now() + expires_in * 1000;
-  await session.save();
-
-  // Clear state cookie — append rather than replace so iron-session's cookie survives
-  const existing = res.getHeader('Set-Cookie');
-  const existing_arr = Array.isArray(existing)
-    ? existing
-    : existing != null
-      ? [String(existing)]
-      : [];
-  res.setHeader('Set-Cookie', [
-    ...existing_arr,
-    'oura-state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax',
-  ]);
+  await saveConnection(uid, 'oura', {
+    accessToken: access_token,
+    refreshToken: refresh_token,
+    expiresAt: Math.floor(Date.now() / 1000) + expires_in,
+  });
 
   res.redirect('/?oura_connected=1');
 }

@@ -21,8 +21,21 @@ export interface AthleteConfig {
   baselineSleep: number;
 }
 
+/** True only when this is a race plan AND the race date is a real, parseable
+ *  date. Everything that decides "race chrome vs. general chrome" keys off this
+ *  — never off `mode` alone — so a general plan can never render a countdown,
+ *  RACE DAY card, or "Invalid Date" even if a stale `mode` string or an empty
+ *  race field slips through. */
+export function isValidRaceDate(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
+  const t = new Date(`${dateStr}T00:00:00`).getTime();
+  return Number.isFinite(t);
+}
+
 export interface PlanConfig {
   mode: string;       // 'race' | 'general'
+  /** Derived: mode === 'race' AND a valid race date exists. Use this, not `mode`. */
+  isRace: boolean;
   weeks: Week[];
   zones: Zone[];
   phases: PhaseInfo[];
@@ -75,6 +88,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
           loading: false,
           plan: {
             mode: plan.mode,
+            isRace: plan.mode === 'race' && isValidRaceDate(race.date),
             weeks: plan.weeks,
             zones: plan.zones,
             phases: plan.phases,

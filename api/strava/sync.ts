@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ensureValidStravaToken } from '../../lib/strava-refresh.js';
+import { verifyUser } from '../../lib/verifyUser.js';
 import type { StravaActivity, StravaRunDetail } from '../../src/types/index.js';
 
 interface StravaActivityRaw {
@@ -101,7 +102,9 @@ async function handleLastRun(req: VercelRequest, res: VercelResponse, token: str
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const token = await ensureValidStravaToken(req, res);
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  const token = await ensureValidStravaToken(user.id);
   if (!token) return res.status(401).json({ error: 'Not connected' });
 
   if (req.query.mode === 'last-run') {

@@ -1,26 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
+import { verifyUser } from '../../lib/verifyUser.js';
+import { signState } from '../../lib/oauthState.js';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  // The state cookie must be set on the same host the OAuth callback lands on
-  // (STRAVA_REDIRECT_URI's host). Vercel deployments are reachable from several
-  // hosts (stable prod alias, per-deploy preview URLs) — if a user starts the
-  // flow from a different host than the fixed redirect_uri, the cookie never
-  // makes it back and Strava's callback fails with "Invalid state parameter".
-  // Bounce to the canonical host first so the cookie always lands where it's needed.
-  const canonicalHost = new URL(process.env.STRAVA_REDIRECT_URI!).host;
-  if (req.headers.host !== canonicalHost) {
-    return res.redirect(`https://${canonicalHost}/api/strava/authorize`);
-  }
+// Called via fetch WITH the Supabase Bearer token (see useStrava.connect), so we
+// know which user is connecting. Returns the Strava authorize URL as JSON — the
+// client then navigates to it. The user id rides along in a signed `state`
+// (no cross-host cookie needed anymore), which the callback verifies.
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-  const state = crypto.randomBytes(16).toString('hex');
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-
-  res.setHeader(
-    'Set-Cookie',
-    `strava-state=${state}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax${secure}`,
-  );
-
+  const state = signState(user.id, 'strava');
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: process.env.STRAVA_CLIENT_ID!,
@@ -30,5 +20,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     state,
   });
 
-  res.redirect(`https://www.strava.com/oauth/authorize?${params}`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ url: `https://www.strava.com/oauth/authorize?${params}` });
 }

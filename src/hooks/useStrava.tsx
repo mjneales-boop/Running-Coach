@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import storage from '../lib/storage';
 import { STORAGE_UPDATED_EVENT } from './useStorage';
+import { authFetch } from '../lib/authFetch';
 import { useCompletion } from './useCompletion';
 import { usePlanConfig } from './usePlanConfig';
 import { getCurrentUserId } from './useAuth';
@@ -46,7 +47,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
   const { weeks } = usePlanConfig();
 
   useEffect(() => {
-    fetch('/api/strava/status')
+    authFetch('/api/strava/status')
       .then((r) => r.json())
       .then(({ connected: c }: { connected: boolean }) => setConnected(c))
       .catch(() => setConnected(false));
@@ -87,7 +88,7 @@ export function StravaProvider({ children }: { children: ReactNode }) {
       setLastError(null);
 
       try {
-        const res = await fetch(`/api/strava/sync?days=${days}`);
+        const res = await authFetch(`/api/strava/sync?days=${days}`);
         if (!res.ok) {
           let msg = `HTTP ${res.status}`;
           try {
@@ -130,12 +131,21 @@ export function StravaProvider({ children }: { children: ReactNode }) {
     [autoComplete],
   );
 
-  const connect = useCallback(() => {
-    window.location.href = '/api/strava/authorize';
+  const connect = useCallback(async () => {
+    // Authorize is user-scoped now: fetch the provider URL (with our signed
+    // state) using the Bearer token, then hand off the browser to Strava.
+    try {
+      const res = await authFetch('/api/strava/authorize');
+      const { url } = (await res.json()) as { url?: string };
+      if (url) window.location.href = url;
+      else setLastError('Could not start Strava connection');
+    } catch {
+      setLastError('Could not start Strava connection');
+    }
   }, []);
 
   const disconnect = useCallback(async () => {
-    await fetch('/api/strava/status', { method: 'POST' });
+    await authFetch('/api/strava/status', { method: 'POST' });
     setConnected(false);
     setLastSynced(null);
   }, []);

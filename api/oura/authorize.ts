@@ -1,22 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
+import { verifyUser } from '../../lib/verifyUser.js';
+import { signState } from '../../lib/oauthState.js';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  // See api/strava/authorize.ts — bounce to the redirect_uri's own host first so
-  // the state cookie always lands on the same host the OAuth callback returns to.
-  const canonicalHost = new URL(process.env.OURA_REDIRECT_URI!).host;
-  if (req.headers.host !== canonicalHost) {
-    return res.redirect(`https://${canonicalHost}/api/oura/authorize`);
-  }
+// See api/strava/authorize.ts — called via fetch with the Supabase Bearer token;
+// returns the Oura authorize URL as JSON with a signed `state` carrying the user id.
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-  const state = crypto.randomBytes(16).toString('hex');
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-
-  res.setHeader(
-    'Set-Cookie',
-    `oura-state=${state}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax${secure}`,
-  );
-
+  const state = signState(user.id, 'oura');
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: process.env.OURA_CLIENT_ID!,
@@ -25,5 +17,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     state,
   });
 
-  res.redirect(`https://cloud.ouraring.com/oauth/authorize?${params}`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ url: `https://cloud.ouraring.com/oauth/authorize?${params}` });
 }
