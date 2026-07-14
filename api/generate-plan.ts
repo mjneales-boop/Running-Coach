@@ -111,12 +111,14 @@ function stripFences(text: string): string {
 async function generateOnce(system: string, messages: Anthropic.MessageParam[]): Promise<string> {
   const stream = anthropic.messages.stream({
     // Sonnet 5 (not the coach's Opus): a full 18-week plan is ~15k tokens of
-    // JSON. Adaptive thinking was unbounded and ran the function past its 300s
-    // limit (504s) on longer race plans, so we cap the thinking budget — this
-    // keeps a single generation around ~60-90s and leaves room for a retry.
+    // JSON. Sonnet 5 only accepts adaptive thinking, whose default effort ran
+    // the function past its 300s limit (504) on longer race plans. Cap it with
+    // output_config.effort='low' — keeps a single generation ~60-90s with room
+    // for a validation retry. The prompt is prescriptive, so low effort is fine.
     model: 'claude-sonnet-5',
     max_tokens: 20000,
-    thinking: { type: 'enabled', budget_tokens: 4000 },
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'low' },
     system,
     messages,
   });
