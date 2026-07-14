@@ -76,13 +76,14 @@ export function OnboardingScreen() {
     return true;
   };
 
-  // The plan is written when a fresh active plan appears in the DB. Onboarding
-  // starts with no plan, so any active plan means generation succeeded. Poll for
-  // it (up to ~4 min) when we can't trust the fetch response — see below.
-  async function waitForPlan(): Promise<boolean> {
-    const deadline = Date.now() + 240_000;
+  // Poll the DB for the freshly-written plan. Onboarding starts with no plan, so
+  // any active plan means generation finished. This runs independently of the
+  // fetch — the request can succeed, error, hang, or be killed by iOS; the plan
+  // landing in the DB is the one signal we can always trust.
+  async function waitForPlan(timeoutMs = 300_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 4000));
       try {
         if (await fetchActivePlan()) return true;
       } catch {
@@ -115,37 +116,42 @@ export function OnboardingScreen() {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
 
-      // Plan generation runs for 1-2 minutes. Mobile Safari kills any fetch that
-      // outlives its ~60s network timeout with "Load failed" — even though the
-      // serverless function keeps running and writes the plan. So we don't rely
-      // on this response alone: if the fetch drops at the network level, we fall
-      // through to polling the DB for the plan the function is still writing.
-      let response: Response | null = null;
-      try {
-        response = await fetch('/api/generate-plan', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({}),
-        });
-      } catch {
-        response = null; // network-level failure (e.g. iOS "Load failed")
-      }
+      // Plan generation runs for 1-2 minutes. On mobile Safari the request can be
+      // killed ("Load failed") or left hanging when the tab backgrounds — but the
+      // serverless function keeps running and writes the plan regardless. So we
+      // race the request against a DB poll: whichever confirms the plan first
+      // wins, and a definitive server error (rate limit / validation) still
+      // surfaces. Awaiting the fetch alone would hang the spinner forever.
+      const request: Promise<'ok' | { error: string } | null> = fetch('/api/generate-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({}),
+      })
+        .then(async (r): Promise<'ok' | { error: string }> => {
+          if (r.ok) return 'ok'; // 200 is only returned after the plan is inserted
+          const data = (await r.json().catch(() => ({}))) as { error?: string };
+          return { error: data.error ?? `HTTP ${r.status}` };
+        })
+        .catch(() => null); // network drop / hang — no verdict, rely on the poll
 
-      if (response) {
-        // A 200 is only returned after the plan is inserted, so trust the status.
-        if (response.ok) {
-          window.location.reload();
-          return;
-        }
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${response.status}`);
-      }
+      const poll: Promise<'plan' | 'timeout'> = waitForPlan().then((found) =>
+        found ? 'plan' : 'timeout',
+      );
 
-      // Fetch dropped mid-flight — wait for the plan the function is still writing.
-      if (await waitForPlan()) {
+      const verdict = await Promise.race([request, poll]);
+
+      if (verdict === 'ok' || verdict === 'plan') {
+        window.location.reload();
+        return;
+      }
+      if (verdict && typeof verdict === 'object') {
+        throw new Error(verdict.error); // server rejected — no plan was written
+      }
+      // verdict is null (request dropped with no verdict) — give the poll its full run.
+      if (verdict === null && (await poll) === 'plan') {
         window.location.reload();
         return;
       }
