@@ -12,6 +12,7 @@ function formatRaceDate(iso: string) {
 }
 
 function formatGoalTime(hms: string) {
+  if (!hms || !hms.includes(':')) return '';
   const [h, m] = hms.split(':');
   return `${Number(h)}:${m}`;
 }
@@ -72,7 +73,7 @@ export function HeroCountdown({ daysToRace, week, phase }: HeroCountdownProps) {
         {displayName}
       </h1>
       <div className="font-mono text-xs uppercase tracking-[0.12em] text-muted">
-        {formatRaceDate(race.date)} · sub {formatGoalTime(race.goalTime)} · MP {race.goalPace}
+        {formatRaceDate(race.date)}{formatGoalTime(race.goalTime) ? ` · sub ${formatGoalTime(race.goalTime)}` : ''} · MP {race.goalPace}
       </div>
       <div className="mt-6 flex items-end gap-3.5">
         <div

@@ -339,8 +339,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Persist: profile pace/goal updates, deactivate old plan, insert new active plan.
     const profilePatch: Record<string, unknown> = { goal_pace: plan.goalPace };
-    if (mode === 'race' && !profile.goal_time && plan.suggestedGoalTime) {
-      profilePatch.goal_time = plan.suggestedGoalTime;
+    if (mode === 'race' && !profile.goal_time) {
+      // The athlete asked us to pick a goal. Derive a realistic marathon goal
+      // from the computed marathon pace so it's always coherent with the paces —
+      // and never left null (the UI renders a null goal as "Sub-0:undefined").
+      const mpSec = computed.marathonPaceSecPerKm;
+      const totalSec = Math.round(mpSec * 42.195);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      profilePatch.goal_time = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      profilePatch.goal_pace = `${Math.floor(mpSec / 60)}:${String(mpSec % 60).padStart(2, '0')}`;
     }
     if (mode === 'race' && !profile.race_time) profilePatch.race_time = '08:00';
     const { error: patchErr } = await supabase.from('profiles').update(profilePatch).eq('id', user.id);

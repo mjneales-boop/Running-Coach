@@ -21,6 +21,7 @@ function formatRaceDateEU(iso: string) {
 }
 
 function formatGoalTime(hms: string) {
+  if (!hms || !hms.includes(':')) return '';
   const [h, m] = hms.split(':');
   return `${Number(h)}:${m}`;
 }
@@ -213,7 +214,11 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           <SettingsRow label="Race date" value={<span className="font-semibold text-muted">{formatRaceDateEU(race.date)}</span>} />
           <SettingsRow
             label="Time goal"
-            value={<span className="font-bold text-accent">Sub-{formatGoalTime(race.goalTime)} · MP {race.goalPace}</span>}
+            value={
+              <span className="font-bold text-accent">
+                {formatGoalTime(race.goalTime) ? `Sub-${formatGoalTime(race.goalTime)} · ` : ''}MP {race.goalPace}
+              </span>
+            }
           />
           <SettingsRow label="Plan length" value={<span className="font-semibold text-muted">{planWeeks} weeks · base → race</span>} />
         </SettingsSection>
