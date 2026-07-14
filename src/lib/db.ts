@@ -196,6 +196,7 @@ export interface ProfilePatch {
   injury_history?: string | null;
   recent_race_times?: { distance: string; time: string }[] | null;
   include_strength?: boolean;
+  strength_days?: number | null;
   race_name?: string | null;
   race_date?: string | null;
   race_time?: string | null;

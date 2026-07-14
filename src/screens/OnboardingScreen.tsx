@@ -3,7 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { ToggleSwitch } from '../components/ui/ToggleSwitch';
-import { updateProfile } from '../lib/db';
+import { updateProfile, fetchActivePlan } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
 type Step = 0 | 1 | 2 | 3;
@@ -27,7 +27,7 @@ interface FormState {
   raceDate: string;
   goalTime: string;
   suggestGoal: boolean;
-  includeStrength: boolean;
+  strengthDays: string;
 }
 
 const INITIAL: FormState = {
@@ -44,7 +44,7 @@ const INITIAL: FormState = {
   raceDate: '',
   goalTime: '',
   suggestGoal: false,
-  includeStrength: false,
+  strengthDays: '0',
 };
 
 const inputClass =
@@ -76,6 +76,22 @@ export function OnboardingScreen() {
     return true;
   };
 
+  // The plan is written when a fresh active plan appears in the DB. Onboarding
+  // starts with no plan, so any active plan means generation succeeded. Poll for
+  // it (up to ~4 min) when we can't trust the fetch response — see below.
+  async function waitForPlan(): Promise<boolean> {
+    const deadline = Date.now() + 240_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      try {
+        if (await fetchActivePlan()) return true;
+      } catch {
+        // transient — keep polling
+      }
+    }
+    return false;
+  }
+
   async function generate() {
     setGenerating(true);
     setError(null);
@@ -89,7 +105,8 @@ export function OnboardingScreen() {
         days_per_week: Number(form.daysPerWeek),
         injury_history: form.injuryHistory.trim() || null,
         recent_race_times: form.raceTimes.filter((r) => r.time.trim()),
-        include_strength: form.includeStrength,
+        include_strength: Number(form.strengthDays) > 0,
+        strength_days: Number(form.strengthDays),
         race_name: form.goal === 'race' ? form.raceName.trim() : null,
         race_date: form.goal === 'race' ? form.raceDate : null,
         goal_time: form.goal === 'race' && !form.suggestGoal && form.goalTime.trim() ? form.goalTime.trim() : null,
@@ -97,17 +114,42 @@ export function OnboardingScreen() {
 
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
-      const r = await fetch('/api/generate-plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({}),
-      });
-      const data = (await r.json()) as { ok?: boolean; error?: string };
-      if (!r.ok || !data.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
-      window.location.reload();
+
+      // Plan generation runs for 1-2 minutes. Mobile Safari kills any fetch that
+      // outlives its ~60s network timeout with "Load failed" — even though the
+      // serverless function keeps running and writes the plan. So we don't rely
+      // on this response alone: if the fetch drops at the network level, we fall
+      // through to polling the DB for the plan the function is still writing.
+      let response: Response | null = null;
+      try {
+        response = await fetch('/api/generate-plan', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({}),
+        });
+      } catch {
+        response = null; // network-level failure (e.g. iOS "Load failed")
+      }
+
+      if (response) {
+        // A 200 is only returned after the plan is inserted, so trust the status.
+        if (response.ok) {
+          window.location.reload();
+          return;
+        }
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${response.status}`);
+      }
+
+      // Fetch dropped mid-flight — wait for the plan the function is still writing.
+      if (await waitForPlan()) {
+        window.location.reload();
+        return;
+      }
+      throw new Error('Still building your plan — reopen the app in a moment and it should be ready.');
     } catch (e) {
       const msg =
         e instanceof Error
@@ -138,7 +180,10 @@ export function OnboardingScreen() {
   }
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-md px-5 pb-16 pt-10">
+    <div
+      className="mx-auto min-h-dvh w-full max-w-md px-5 pb-16"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2.25rem)' }}
+    >
       <Eyebrow>Set up · step {step + 1} of 4</Eyebrow>
       <h1
         className="mb-7 mt-3 font-display text-[34px] font-extrabold uppercase leading-[0.95] tracking-[-0.01em]"
@@ -285,14 +330,22 @@ export function OnboardingScreen() {
 
         {step === 3 && (
           <>
-            <div className="mb-5 flex items-center justify-between gap-3.5">
-              <div>
-                <div className="text-[15.5px] font-semibold">Include gym days</div>
-                <div className="mt-1 max-w-[26ch] font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted">
-                  2-3 strength sessions a week alongside the running
-                </div>
+            <div className="mb-5">
+              <div className="text-[15.5px] font-semibold">Strength sessions</div>
+              <div className="mb-3 mt-1 max-w-[30ch] font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted">
+                Gym days per week alongside the running
               </div>
-              <ToggleSwitch checked={form.includeStrength} onChange={(v) => set('includeStrength', v)} />
+              <SegmentedControl
+                value={form.strengthDays}
+                onChange={(v) => set('strengthDays', v)}
+                options={[
+                  { value: '0', label: 'None' },
+                  { value: '1', label: '1' },
+                  { value: '2', label: '2' },
+                  { value: '3', label: '3' },
+                  { value: '4', label: '4' },
+                ]}
+              />
             </div>
             <p className="text-[13.5px] leading-relaxed text-muted">
               That's everything. The coach will build{' '}

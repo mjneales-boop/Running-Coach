@@ -21,6 +21,7 @@ interface ProfileRow {
   injury_history: string | null;
   recent_race_times: { distance: string; time: string }[] | null;
   include_strength: boolean | null;
+  strength_days: number | null;
   race_name: string | null;
   race_date: string | null;
   race_time: string | null;
@@ -45,7 +46,7 @@ function nextMonday(from: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function systemPrompt(mode: 'race' | 'general', includeStrength: boolean): string {
+function systemPrompt(mode: 'race' | 'general', strengthDays: number): string {
   return `You are STRIDE's head coach, generating a personalized running training plan. You follow Magness-style training principles:
 
 - Build a large aerobic base. The majority of weekly volume is genuinely easy, conversational running.
@@ -60,7 +61,7 @@ function systemPrompt(mode: 'race' | 'general', includeStrength: boolean): strin
 - Race mode ends with a 2-3 week taper into race day.
 - Respect the athlete's available days per week exactly — all other days are REST.
 - Respect injury history: if the athlete is injury-prone, be conservative with volume and impact; an easy bike (type BIKE) can substitute for an easy run.
-${includeStrength ? '- The athlete wants gym/strength days: schedule 2-3 per week on easy or rest days using the "gym" (display name) + "workoutId" fields. Valid workoutId values: "chestback", "shouldersarms", "legs". Include "legs" weekly.' : '- The athlete does NOT want gym days: never set the gym or workoutId fields.'}
+${strengthDays > 0 ? `- The athlete wants EXACTLY ${strengthDays} gym/strength session${strengthDays > 1 ? 's' : ''} per week: schedule exactly ${strengthDays} per week on easy or rest days using the "gym" (display name) + "workoutId" fields. Valid workoutId values: "chestback", "shouldersarms", "legs". Include "legs" at least once${strengthDays > 1 ? ' each week' : ''}. Never schedule more or fewer than ${strengthDays}.` : '- The athlete does NOT want gym days: never set the gym or workoutId fields.'}
 
 ## Session-guide reference (the coach's voice — your sessions MUST be consistent with these definitions)
 
@@ -142,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select(
-        'weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, injury_history, recent_race_times, include_strength, race_name, race_date, race_time, goal_time',
+        'weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
       )
       .maybeSingle<ProfileRow>();
     if (profErr) throw profErr;
@@ -158,6 +159,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if ((plansToday ?? 0) >= 3) {
       return res.status(429).json({ error: 'Daily plan limit reached (3 per day). Try again tomorrow.' });
     }
+
+    // Prefer the explicit count; fall back to the legacy boolean (→ 3/week).
+    const strengthDays = profile.strength_days ?? (profile.include_strength ? 3 : 0);
 
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
@@ -177,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         daysAvailablePerWeek: profile.days_per_week,
         injuryHistory: profile.injury_history || 'none reported',
         recentRaceTimes: profile.recent_race_times ?? [],
-        includeStrength: !!profile.include_strength,
+        strengthDaysPerWeek: strengthDays,
       },
     };
 
@@ -242,7 +246,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     }
 
-    const system = systemPrompt(mode, !!profile.include_strength);
+    const system = systemPrompt(mode, strengthDays);
     const messages: Anthropic.MessageParam[] = [
       { role: 'user', content: `ATHLETE (JSON):\n${JSON.stringify(userContext)}` },
     ];
