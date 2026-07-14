@@ -72,9 +72,26 @@ export interface CoachContext {
     | null;
   /** Today plus the next ~9 days of the plan, spanning into next week if needed — lets the coach answer "what's tomorrow / this weekend / next week" questions. Only the near-term entries (first ~4) carry full `guide` detail, to bound context size. */
   upcoming: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string; guide?: GuideSummary[] }[];
-  /** Actual logged runs from Strava, most recent first — real pace/HR/distance, not just the plan.
-   *  `daysAgo` is relative to `today` (0 = today, 1 = yesterday) so the coach can judge recency. */
+  /** Actual logged runs from Strava over the last 30 days, most recent first — real
+   *  pace/HR/distance, not just the plan. `daysAgo` is relative to `today` (0 = today,
+   *  1 = yesterday) so the coach can judge recency. */
   recentRuns: { date: string; daysAgo: number; distanceKm: number; avgPaceMinKm: number; avgHR?: number }[];
+  /** The whole plan as a lightweight skeleton (no per-session guide text) so the coach can
+   *  locate any day/week by date — today's + near-term sessions still carry full guide detail
+   *  in `today`/`upcoming`. */
+  fullPlan: {
+    weeks: {
+      id: string;
+      label: string;
+      num: string;
+      phase: number;
+      targetKm: number;
+      cutback?: boolean;
+      peak?: boolean;
+      race?: boolean;
+      days: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string }[];
+    }[];
+  };
   /** Completed km per week for the last few weeks (oldest first) plus this week — use for volume-trend questions ("how has my training been going the last few weeks"). */
   recentWeeks: { label: string; kmDone: number; targetKm: number }[];
   stravaConnected: boolean;
@@ -172,13 +189,37 @@ export function buildCoachContext(
         }
       : null,
     upcoming: upcomingDays(today, weeks, plan.sessionGuide),
-    recentRuns: activities.slice(0, 10).map((a) => ({
-      date: a.date,
-      daysAgo: daysAgoFrom(today, a.date),
-      distanceKm: a.distanceKm,
-      avgPaceMinKm: a.avgPaceMinKm,
-      avgHR: a.avgHR,
-    })),
+    recentRuns: activities
+      .filter((a) => daysAgoFrom(today, a.date) <= 30)
+      .map((a) => ({
+        date: a.date,
+        daysAgo: daysAgoFrom(today, a.date),
+        distanceKm: a.distanceKm,
+        avgPaceMinKm: a.avgPaceMinKm,
+        avgHR: a.avgHR,
+      })),
+    fullPlan: {
+      weeks: weeks
+        .filter((w) => w.phase !== 0)
+        .map((w) => ({
+          id: w.id,
+          label: w.label,
+          num: w.num,
+          phase: w.phase,
+          targetKm: w.targetKm,
+          ...(w.cutback && { cutback: true }),
+          ...(w.peak && { peak: true }),
+          ...(w.race && { race: true }),
+          days: w.days.map((d) => ({
+            date: d.date,
+            weekday: weekdayShort(d.date),
+            type: d.type,
+            title: d.title,
+            ...(d.km != null && { km: d.km }),
+            ...(d.pace && { pace: d.pace }),
+          })),
+        })),
+    },
     recentWeeks,
     stravaConnected: activities.length > 0,
   };
