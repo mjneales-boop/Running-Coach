@@ -13,10 +13,13 @@ import { useCurrentDate } from './hooks/useCurrentDate';
 import { CompletionProvider, useCompletion } from './hooks/useCompletion';
 import { useReadiness } from './hooks/useReadiness';
 import { SwapsProvider, useSwaps } from './hooks/useSwaps';
+import { RunSummariesProvider } from './hooks/useRunSummaries';
 import { useStorage } from './hooks/useStorage';
 import { GymScheduleProvider, useGymSchedule } from './hooks/useGymSchedule';
 import { OuraProvider, useOura } from './hooks/useOura';
 import { StravaProvider, useStrava } from './hooks/useStrava';
+import { useLastRun } from './hooks/useLastRun';
+import { useCoachMessages } from './hooks/useCoachMessages';
 import { useAutoSync } from './hooks/useAutoSync';
 import { useBlockExtension } from './hooks/useBlockExtension';
 import { usePlan } from './hooks/usePlan';
@@ -60,13 +63,15 @@ function AuthGate() {
       <PlanProvider>
         <CompletionProvider>
           <SwapsProvider>
-            <GymScheduleProvider>
-              <OuraProvider>
-                <StravaProvider>
-                  <AppShell />
-                </StravaProvider>
-              </OuraProvider>
-            </GymScheduleProvider>
+            <RunSummariesProvider>
+              <GymScheduleProvider>
+                <OuraProvider>
+                  <StravaProvider>
+                    <AppShell />
+                  </StravaProvider>
+                </OuraProvider>
+              </GymScheduleProvider>
+            </RunSummariesProvider>
           </SwapsProvider>
         </CompletionProvider>
       </PlanProvider>
@@ -91,6 +96,8 @@ function AppShell() {
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
   const oura = useOura();
   const strava = useStrava();
+  const { run: lastRun } = useLastRun(strava.connected);
+  const { messages: coachMessages, setMessages: setCoachMessages } = useCoachMessages();
   useAutoSync(oura, strava);
   useBlockExtension(today);
 
@@ -112,6 +119,19 @@ function AppShell() {
     setStrengthFocus({ weekId, dayAbbr });
     setTab('strength');
     setSessionModal(null);
+  };
+
+  // Seed the coach chat with the post-run summary (as a natural user→assistant opener so
+  // the history is Anthropic-valid) and jump to the Coach tab to continue the conversation.
+  const continueInCoach = (summary: string, hadRunData: boolean) => {
+    const opener = hadRunData ? "How did today's run look?" : 'I just finished my run.';
+    void setCoachMessages([
+      ...coachMessages,
+      { role: 'user', content: opener },
+      { role: 'assistant', content: summary },
+    ]);
+    setSessionModal(null);
+    setTab('coach');
   };
 
   useEffect(() => {
@@ -176,9 +196,11 @@ function AppShell() {
               swapMap={swaps[sessionModal.weekId] ?? {}}
               onSwapDay={(a, b) => swapDays(sessionModal.weekId, a, b)}
               stravaActivities={stravaActivities}
+              lastRun={lastRun}
               onAddGym={setGymOnDay}
               onRemoveGym={removeGymFromDay}
               onNavigateToStrength={navigateToStrength}
+              onContinueInCoach={continueInCoach}
             />
           );
         })()}

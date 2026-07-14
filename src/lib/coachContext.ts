@@ -9,10 +9,12 @@ import {
   readinessHeadline,
   readinessAdjustment,
   buildProgressStats,
+  nextNonRestDay,
 } from './logic';
+import { analyzeRunZones, intendedZone, zoneMatch } from './runAnalysis';
 import { guideEntriesForDay } from './coaching';
 import type { GuideEntry } from './sessionGuides';
-import type { CompletionEntry, Day, ReadinessEntry, StravaActivity, Week } from '../types';
+import type { CompletionEntry, Day, ReadinessEntry, StravaActivity, StravaRunDetail, Week } from '../types';
 
 interface GuideSummary {
   label: string;
@@ -255,6 +257,124 @@ export function buildCoachContext(
     },
     recentWeeks,
     stravaConnected: activities.length > 0,
+  };
+}
+
+export interface RunSummaryContext {
+  todayDate: string;
+  athlete: { name: string; age: number | null; experience: string | null };
+  /** The planned session the athlete just completed. */
+  session: {
+    type: string;
+    title: string;
+    km?: number;
+    pace?: string;
+    /** Zone the prescribed pace calls for — what "the right place" means for this run. */
+    intendedZone: { name: string; pace: string; hr: string } | null;
+    guide?: GuideSummary[];
+    readinessAdjustment?: string;
+  };
+  /** True when we have real Strava data for this run; drives the debrief-vs-questions branch. */
+  hasRunData: boolean;
+  stravaConnected: boolean;
+  /** What actually happened, from Strava — present only when hasRunData is true. */
+  actual: {
+    distanceKm: number;
+    avgPaceMinKm: number;
+    avgHR: number | null;
+    maxHR: number | null;
+    /** HR-zone distribution derived from per-km splits (approximate). */
+    zones: { zone: string; splits: number; km: number }[];
+    dominantZone: string | null;
+    /** Did the dominant zone match what the session intended? */
+    hitIntendedZone: boolean;
+  } | null;
+  /** The athlete's own free-text notes on the run, if any. */
+  userNotes: string | null;
+  readiness: {
+    connected: boolean;
+    score?: number;
+    headline: string;
+  };
+  /** The next non-rest session, so the coach can look forward / advise recover-vs-push. */
+  nextSession: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string } | null;
+}
+
+/**
+ * Focused context for the post-run coach summary (api/post-run-summary). Reuses the
+ * same plan/readiness/zone plumbing as buildCoachContext but centered on ONE completed
+ * session and its actual Strava data, with an HR-zone read from the run's splits.
+ */
+export function buildRunSummaryContext(
+  day: Day,
+  entry: CompletionEntry,
+  runDetail: StravaRunDetail | null,
+  activitySummary: StravaActivity | undefined,
+  readinessEntry: ReadinessEntry,
+  plan: PlanConfig,
+): RunSummaryContext {
+  const { weeks, zones, athlete } = plan;
+  const sessionDate = new Date(`${day.date}T12:00:00`);
+  const week = findCurrentWeek(sessionDate, weeks);
+  const next = nextNonRestDay(sessionDate, week, weeks);
+
+  const intended = intendedZone(day, zones);
+  const hasSplits = !!runDetail && runDetail.date === day.date && runDetail.splits.length > 0;
+  const hasSummary = !!activitySummary?.avgHR || !!activitySummary?.distanceKm;
+  const hasRunData = hasSplits || hasSummary;
+
+  let actual: RunSummaryContext['actual'] = null;
+  if (hasRunData) {
+    const analysis = analyzeRunZones(
+      hasSplits ? runDetail!.splits : undefined,
+      zones,
+      {
+        avgHR: runDetail?.avgHR ?? activitySummary?.avgHR,
+        maxHR: runDetail?.maxHR,
+        distanceKm: runDetail?.distanceKm ?? activitySummary?.distanceKm,
+      },
+    );
+    actual = {
+      distanceKm: runDetail?.distanceKm ?? activitySummary?.distanceKm ?? 0,
+      avgPaceMinKm: runDetail?.avgPaceMinKm ?? activitySummary?.avgPaceMinKm ?? 0,
+      avgHR: analysis.avgHR,
+      maxHR: analysis.maxHR,
+      zones: analysis.perZone,
+      dominantZone: analysis.dominantZone,
+      hitIntendedZone: zoneMatch(analysis, intended),
+    };
+  }
+
+  const hasReadiness = readinessEntry.score != null;
+  const { headline } = readinessHeadline(readinessEntry.score);
+
+  return {
+    todayDate: localDateStr(new Date()),
+    athlete: { name: athlete.name, age: athlete.age, experience: athlete.experience },
+    session: {
+      type: day.type,
+      title: day.title,
+      km: day.km,
+      pace: day.pace,
+      intendedZone: intended ? { name: intended.name, pace: intended.pace, hr: intended.hr } : null,
+      guide: guideSummary(day, plan.sessionGuide),
+      readinessAdjustment: readinessAdjustment(readinessEntry.score),
+    },
+    hasRunData,
+    stravaConnected: hasRunData,
+    actual,
+    userNotes: entry.notes?.trim() ? entry.notes.trim() : null,
+    readiness: { connected: hasReadiness, score: readinessEntry.score, headline },
+    nextSession: next
+      ? {
+          date: next.date,
+          weekday: weekdayShort(next.date),
+          type: next.type,
+          title: next.title,
+          km: next.km,
+          pace: next.pace,
+        }
+      : null,
   };
 }
 
