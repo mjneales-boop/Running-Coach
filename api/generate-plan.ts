@@ -259,6 +259,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { role: 'user', content: `ATHLETE (JSON):\n${JSON.stringify(userContext)}` },
     ];
 
+    // Diagnostic: log the exact athlete profile handed to the generator, so a
+    // successful run leaves proof of what it was built from (verifiable in the
+    // Vercel runtime logs). No PII beyond what the user entered themselves.
+    console.log('generate-plan athlete context', JSON.stringify(userContext.athlete));
+
     // First attempt, then one retry with the validation error fed back.
     let plan: GeneratedPlan | null = null;
     let lastError = '';
