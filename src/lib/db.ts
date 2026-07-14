@@ -203,6 +203,7 @@ export interface ProfilePatch {
   experience?: string | null;
   weekly_km_current?: number | null;
   days_per_week?: number | null;
+  long_run_day?: string | null;
   injury_history?: string | null;
   recent_race_times?: { distance: string; time: string }[] | null;
   include_strength?: boolean;

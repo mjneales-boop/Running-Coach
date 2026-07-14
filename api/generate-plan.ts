@@ -19,6 +19,7 @@ interface ProfileRow {
   experience: string | null;
   weekly_km_current: number | null;
   days_per_week: number | null;
+  long_run_day: string | null;
   injury_history: string | null;
   recent_race_times: { distance: string; time: string }[] | null;
   include_strength: boolean | null;
@@ -63,6 +64,7 @@ function systemPrompt(mode: 'race' | 'general', strengthDays: number): string {
 - Long runs progress steadily; in race builds, later long runs finish with goal-pace segments.
 - Race mode ends with a 2-3 week taper into race day.
 - Respect the athlete's available days per week exactly — all other days are REST.
+- Place the weekly LONG run on the athlete's preferredLongRunDay when one is given (not "no preference"); keep it there every week so their schedule is predictable. If that day is unavailable given their run-day count, put the long run on the nearest available day and note it. With no preference, default long runs to the weekend.
 - Respect injury history: if the athlete is injury-prone, be conservative with volume and impact; an easy bike (type BIKE) can substitute for an easy run.
 - Account for the athlete's age: masters runners (40+) recover more slowly — use a gentler volume ramp, more recovery/easy days between quality, and cap high-intensity (VO2/threshold) frequency; for 55+ be more conservative still. Younger athletes (under ~30) tolerate a steeper progression and more frequent quality.
 ${strengthDays > 0 ? `- The athlete wants EXACTLY ${strengthDays} gym/strength session${strengthDays > 1 ? 's' : ''} per week: schedule exactly ${strengthDays} per week on easy or rest days using the "gym" (display name) + "workoutId" fields. Valid workoutId values: "chestback", "shouldersarms", "legs". Include "legs" at least once${strengthDays > 1 ? ' each week' : ''}. Never schedule more or fewer than ${strengthDays}.` : '- The athlete does NOT want gym days: never set the gym or workoutId fields.'}
@@ -174,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select(
-        'age, weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
+        'age, weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, long_run_day, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
       )
       .maybeSingle<ProfileRow>();
     if (profErr) throw profErr;
@@ -211,6 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         experience: profile.experience,
         currentWeeklyKm: profile.weekly_km_current,
         daysAvailablePerWeek: profile.days_per_week,
+        preferredLongRunDay: profile.long_run_day || 'no preference',
         injuryHistory: profile.injury_history || 'none reported',
         recentRaceTimes: profile.recent_race_times ?? [],
         strengthDaysPerWeek: strengthDays,

@@ -22,6 +22,7 @@ interface FormState {
   experience: 'beginner' | 'intermediate' | 'advanced';
   weeklyKm: string;
   daysPerWeek: string;
+  longRunDay: string; // 'mon'..'sun', or '' for no preference
   injuryHistory: string;
   raceTimes: RaceTime[];
   goal: 'race' | 'general';
@@ -41,6 +42,7 @@ const INITIAL: FormState = {
   experience: 'intermediate',
   weeklyKm: '',
   daysPerWeek: '4',
+  longRunDay: 'sat',
   injuryHistory: '',
   raceTimes: [],
   goal: 'race',
@@ -111,6 +113,7 @@ export function OnboardingScreen() {
         experience: form.experience,
         weekly_km_current: Number(form.weeklyKm),
         days_per_week: Number(form.daysPerWeek),
+        long_run_day: form.longRunDay || null,
         injury_history: form.injuryHistory.trim() || null,
         recent_race_times: form.raceTimes.filter((r) => r.time.trim()),
         include_strength: Number(form.strengthDays) > 0,
@@ -268,6 +271,27 @@ export function OnboardingScreen() {
                 options={['2', '3', '4', '5', '6', '7'].map((v) => ({ value: v, label: v }))}
               />
             </Field>
+            <Field label="Long run day">
+              <select
+                value={form.longRunDay}
+                onChange={(e) => set('longRunDay', e.target.value)}
+                className={`${inputClass} appearance-none`}
+                style={{ WebkitAppearance: 'none' }}
+              >
+                <option value="">No preference — let the coach decide</option>
+                {[
+                  { v: 'mon', l: 'Monday' },
+                  { v: 'tue', l: 'Tuesday' },
+                  { v: 'wed', l: 'Wednesday' },
+                  { v: 'thu', l: 'Thursday' },
+                  { v: 'fri', l: 'Friday' },
+                  { v: 'sat', l: 'Saturday' },
+                  { v: 'sun', l: 'Sunday' },
+                ].map((d) => (
+                  <option key={d.v} value={d.v}>{d.l}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="Injury history (optional)">
               <textarea
                 value={form.injuryHistory}
@@ -326,7 +350,11 @@ export function OnboardingScreen() {
                 you near the end of a block, the next one is generated from what you actually ran.
               </p>
             )}
-            <Field label="Recent race times (optional — helps set your paces)">
+            <Field label="Recent times (optional — the best way to set your paces)">
+              <p className="mb-2.5 -mt-0.5 text-[12.5px] leading-snug text-muted">
+                A race, a parkrun, a time trial — or just your fastest recent hard run over a known
+                distance. Even one makes your paces far more accurate.
+              </p>
               {form.raceTimes.map((rt, i) => (
                 <div key={i} className="mb-2 flex gap-2">
                   <select
@@ -334,9 +362,10 @@ export function OnboardingScreen() {
                     onChange={(e) =>
                       set('raceTimes', form.raceTimes.map((x, j) => (j === i ? { ...x, distance: e.target.value } : x)))
                     }
-                    className={`${inputClass} w-32`}
+                    className={`${inputClass} w-32 appearance-none`}
+                    style={{ WebkitAppearance: 'none' }}
                   >
-                    {['5K', '10K', 'Half', 'Marathon'].map((d) => (
+                    {['1 mile', '3K', '5K', '10K', 'Half', 'Marathon'].map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
@@ -352,10 +381,10 @@ export function OnboardingScreen() {
               ))}
               <button
                 type="button"
-                onClick={() => set('raceTimes', [...form.raceTimes, { distance: '10K', time: '' }])}
+                onClick={() => set('raceTimes', [...form.raceTimes, { distance: '5K', time: '' }])}
                 className="mt-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent"
               >
-                + Add a race time
+                + Add a time
               </button>
             </Field>
           </>
