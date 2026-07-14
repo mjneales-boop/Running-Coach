@@ -39,6 +39,21 @@ export interface CoachContext {
    *  the only temporal anchor in general mode, where there's no race countdown. */
   todayDate: string;    // YYYY-MM-DD
   todayWeekday: string; // e.g. 'Monday'
+  /** Who the athlete is — from onboarding. Lets the coach tailor advice to age,
+   *  experience, typical volume, injury history and PBs, and answer "what do you
+   *  know about me" honestly. Fields are null when the athlete didn't provide them. */
+  athlete: {
+    name: string;
+    age: number | null;
+    sex: string | null;
+    weightKg: number | null;
+    heightCm: number | null;
+    experience: string | null;
+    typicalWeeklyKm: number | null;
+    daysPerWeek: number | null;
+    injuryHistory: string;
+    recentRaceTimes: { distance: string; time: string }[];
+  };
   /** null in general-fitness mode — the athlete is not training for a race. */
   race: { name: string; date: string; goalTime: string; goalPace: string } | null;
   mode: string;
@@ -159,6 +174,18 @@ export function buildCoachContext(
   return {
     todayDate: localDateStr(today),
     todayWeekday: today.toLocaleDateString('en-US', { weekday: 'long' }),
+    athlete: {
+      name: athlete.name,
+      age: athlete.age,
+      sex: athlete.sex,
+      weightKg: athlete.weightKg,
+      heightCm: athlete.heightCm,
+      experience: athlete.experience,
+      typicalWeeklyKm: athlete.weeklyKmTypical,
+      daysPerWeek: athlete.daysPerWeek,
+      injuryHistory: plan.injuryHistory || 'none reported',
+      recentRaceTimes: athlete.recentRaceTimes,
+    },
     race: isRace
       ? { name: race.name, date: race.date, goalTime: race.goalTime, goalPace: race.goalPace }
       : null,

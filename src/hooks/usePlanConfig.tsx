@@ -15,6 +15,14 @@ export interface RaceConfig {
 
 export interface AthleteConfig {
   name: string;
+  age: number | null;
+  sex: string | null;
+  weightKg: number | null;
+  heightCm: number | null;
+  experience: string | null;
+  weeklyKmTypical: number | null;
+  daysPerWeek: number | null;
+  recentRaceTimes: { distance: string; time: string }[];
   maxHR: number;
   baselineHRV: number;
   baselineRHR: number;
@@ -96,6 +104,14 @@ export function PlanProvider({ children }: { children: ReactNode }) {
             race,
             athlete: {
               name: profile.display_name ?? '',
+              age: profile.age ?? null,
+              sex: profile.sex ?? null,
+              weightKg: profile.weight_kg ?? null,
+              heightCm: profile.height_cm ?? null,
+              experience: profile.experience ?? null,
+              weeklyKmTypical: profile.weekly_km_current ?? null,
+              daysPerWeek: profile.days_per_week ?? null,
+              recentRaceTimes: profile.recent_race_times ?? [],
               maxHR: Number(profile.max_hr ?? 0),
               baselineHRV: Number(profile.baseline_hrv ?? 0),
               baselineRHR: Number(profile.baseline_rhr ?? 0),

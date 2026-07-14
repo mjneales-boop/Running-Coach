@@ -159,6 +159,14 @@ export async function fetchActivePlan(): Promise<ActivePlan | null> {
 export interface ProfileRow {
   id: string;
   display_name: string | null;
+  age: number | null;
+  sex: string | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  experience: string | null;
+  weekly_km_current: number | null;
+  days_per_week: number | null;
+  recent_race_times: { distance: string; time: string }[] | null;
   race_name: string | null;
   race_date: string | null;
   race_time: string | null;
@@ -171,6 +179,7 @@ export interface ProfileRow {
   max_hr: number | null;
   injury_history: string | null;
   include_strength: boolean | null;
+  strength_days: number | null;
   is_admin: boolean;
 }
 
@@ -178,7 +187,7 @@ export async function fetchProfile(): Promise<ProfileRow | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, display_name, race_name, race_date, race_time, race_location, goal_time, goal_pace, baseline_hrv, baseline_rhr, baseline_sleep, max_hr, injury_history, include_strength, is_admin',
+      'id, display_name, age, sex, weight_kg, height_cm, experience, weekly_km_current, days_per_week, recent_race_times, race_name, race_date, race_time, race_location, goal_time, goal_pace, baseline_hrv, baseline_rhr, baseline_sleep, max_hr, injury_history, include_strength, strength_days, is_admin',
     )
     .maybeSingle();
   if (error) throw error;
