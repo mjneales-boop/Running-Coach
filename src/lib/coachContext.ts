@@ -1,4 +1,3 @@
-import { SEED_READINESS } from '../constants/plan';
 import type { PlanConfig } from '../hooks/usePlanConfig';
 import {
   findCurrentWeek,
@@ -47,6 +46,8 @@ export interface CoachContext {
   goalPace: string;
   week: { num: string; phase: string; daysOut: number | null; targetKm: number; doneKm: number };
   readiness: {
+    /** false when the athlete hasn't linked Oura / has no readiness data — the coach must NOT cite numbers then. */
+    connected: boolean;
     score?: number;
     headline: string;
     hrv?: number;
@@ -141,7 +142,11 @@ export function buildCoachContext(
   const weekIndex = findCurrentWeekIndex(today, weeks);
   const phase = currentPhase(week, phases);
   const todaySession = findTodaySession(today, week);
-  const r = readinessEntry.score != null ? readinessEntry : SEED_READINESS;
+  // No SEED fallback: a fresh account with no Oura data must NOT inherit the
+  // seed's (owner's) HRV/RHR/sleep numbers — the coach would report them as the
+  // user's. Pass the real entry (possibly empty) and flag whether it's real.
+  const hasReadiness = readinessEntry.score != null;
+  const r = readinessEntry;
   const { headline } = readinessHeadline(r.score);
   const activities = Object.values(stravaActivities).sort((a, b) => b.date.localeCompare(a.date));
   const progress = buildProgressStats(weeks, completion, weekIndex, peakKm);
@@ -167,6 +172,7 @@ export function buildCoachContext(
       doneKm: weeklyKmDone(week, completion),
     },
     readiness: {
+      connected: hasReadiness,
       score: r.score,
       headline,
       hrv: r.hrv,

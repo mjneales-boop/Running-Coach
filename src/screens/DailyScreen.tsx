@@ -18,7 +18,6 @@ import { useStrava } from '../hooks/useStrava';
 import { useLastRun } from '../hooks/useLastRun';
 import { useSwaps } from '../hooks/useSwaps';
 import { useGymSchedule } from '../hooks/useGymSchedule';
-import { SEED_READINESS } from '../constants/plan';
 import {
   weeklyKmDone,
   nextNonRestDay,
@@ -67,8 +66,9 @@ export function DailyScreen({
     [rawCurrentWeek, swaps, gymOverrides],
   );
   const todaySession = useMemo(() => findTodaySession(today, currentWeek), [today, currentWeek]);
-  // Once connected, a fresh account may not have synced yet — seed data keeps the card meaningful in that gap.
-  const readinessEntry = latestEntry.score != null ? latestEntry : SEED_READINESS;
+  // Use the athlete's own reading only — never the seed (owner's) numbers. Before
+  // the first sync this is empty and the card shows "—" rather than fake data.
+  const readinessEntry = latestEntry;
   // A new user has no profile baselines (they'd show "base 0"). Derive them from
   // their own Oura history; fall back to the latest reading so the number is never 0.
   const baselines = useMemo(() => {
