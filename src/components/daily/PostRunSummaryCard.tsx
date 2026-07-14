@@ -76,10 +76,10 @@ export function PostRunSummaryCard({
   }, [cached, generate]);
 
   return (
-    <div className="stride-rise mb-6 rounded-[18px] border border-hairline bg-surface p-[22px]">
+    <div className="stride-rise mb-[26px] overflow-hidden rounded-[18px] border border-[rgba(0,217,255,0.3)] bg-[rgba(0,217,255,0.05)] p-[22px] shadow-[0_0_24px_-8px_rgba(0,217,255,0.25)]">
       <div className="mb-3 flex items-center justify-between">
         <Tag tone="accent">Coach</Tag>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">Post-run</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent/70">Post-run</span>
       </div>
 
       {loading && !summary && (

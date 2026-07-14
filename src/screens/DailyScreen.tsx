@@ -5,6 +5,7 @@ import { ReadinessCard } from '../components/daily/ReadinessCard';
 import { WeekProgressCard } from '../components/daily/WeekProgressCard';
 import { StrengthLinkCard } from '../components/daily/StrengthLinkCard';
 import { LastRunCard } from '../components/daily/LastRunCard';
+import { PostRunSummaryCard } from '../components/daily/PostRunSummaryCard';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
@@ -18,6 +19,8 @@ import { useStrava } from '../hooks/useStrava';
 import { useLastRun } from '../hooks/useLastRun';
 import { useSwaps } from '../hooks/useSwaps';
 import { useGymSchedule } from '../hooks/useGymSchedule';
+import { useStorage } from '../hooks/useStorage';
+import type { StravaActivity } from '../types';
 import {
   weeklyKmDone,
   nextNonRestDay,
@@ -41,6 +44,8 @@ interface DailyScreenProps {
   onOpenSettings: () => void;
   onCompleteToday: () => void;
   onOpenDetails: () => void;
+  /** Seed the coach chat with the post-run summary and jump to the Coach tab. */
+  onContinueInCoach: (summary: string, hadRunData: boolean) => void;
 }
 
 export function DailyScreen({
@@ -49,6 +54,7 @@ export function DailyScreen({
   onOpenSettings,
   onCompleteToday,
   onOpenDetails,
+  onContinueInCoach,
 }: DailyScreenProps) {
   const today = useCurrentDate();
   const { currentWeek: rawCurrentWeek, currentPhase, daysToRace, weeks } = usePlan(today, 0);
@@ -60,6 +66,7 @@ export function DailyScreen({
   const oura = useOura();
   const strava = useStrava();
   const lastRun = useLastRun(strava.connected);
+  const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
 
   const currentWeek = useMemo(
     () => applyGymOverrides(applySwapsToWeek(rawCurrentWeek, swaps[rawCurrentWeek.id] ?? {}), gymOverrides),
@@ -130,6 +137,18 @@ export function DailyScreen({
             onDetails={onOpenDetails}
           />
         )
+      )}
+
+      {todayDone && todaySession && ['LONG', 'WORKOUT', 'EASY'].includes(todaySession.type) && (
+        <PostRunSummaryCard
+          weekId={currentWeek.id}
+          dayAbbr={todaySession.d}
+          day={todaySession}
+          entry={completion[`${currentWeek.id}-${todaySession.d}`] ?? { done: true }}
+          runDetail={lastRun.run && lastRun.run.date === todaySession.date ? lastRun.run : null}
+          activitySummary={stravaActivities[todaySession.date]}
+          onContinueInCoach={onContinueInCoach}
+        />
       )}
 
       <div className="stride-rise mb-3.5 flex items-baseline justify-between">

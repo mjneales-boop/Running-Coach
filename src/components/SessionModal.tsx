@@ -4,14 +4,13 @@ import { Tag } from './ui/Tag';
 import { Button } from './ui/Button';
 import { StatBlock } from './daily/SessionCard';
 import { StrengthLinkCard } from './daily/StrengthLinkCard';
-import { PostRunSummaryCard } from './daily/PostRunSummaryCard';
 import { PaceProgressionChart } from './progress/PaceProgressionChart';
 import { guideEntriesForDay } from '../lib/coaching';
 import { estimateDuration, zoneForPace } from '../lib/logic';
 import { usePlanConfig } from '../hooks/usePlanConfig';
 import { SESSION_TYPE_LABEL } from '../lib/coachNotes';
 import { WORKOUTS } from '../constants/workouts';
-import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, StravaActivity, StravaRunDetail } from '../types';
+import type { Week, Day, CompletionEntry, DayAbbr, WeekContentMap, StravaActivity } from '../types';
 
 const GYM_OPTIONS = Object.values(WORKOUTS).map((w) => ({ id: w.id, name: w.name }));
 
@@ -26,13 +25,9 @@ interface SessionModalProps {
   swapMap: WeekContentMap;
   onSwapDay: (dayA: DayAbbr, dayB: DayAbbr) => void;
   stravaActivities?: Record<string, StravaActivity>;
-  /** Rich last-run detail (per-km HR splits) — used for the post-run summary when its date matches. */
-  lastRun?: StravaRunDetail | null;
   onAddGym: (date: string, gym: string, workoutId: string) => void;
   onRemoveGym: (date: string) => void;
   onNavigateToStrength: (weekId: string, dayAbbr: DayAbbr) => void;
-  /** Seed the coach chat with the post-run summary and jump to the Coach tab. */
-  onContinueInCoach: (summary: string, hadRunData: boolean) => void;
 }
 
 export function SessionModal({
@@ -46,11 +41,9 @@ export function SessionModal({
   swapMap,
   onSwapDay,
   stravaActivities,
-  lastRun,
   onAddGym,
   onRemoveGym,
   onNavigateToStrength,
-  onContinueInCoach,
 }: SessionModalProps) {
   const { zones, sessionGuide } = usePlanConfig();
   const day: Day | undefined = week.days.find((d) => d.d === dayAbbr);
@@ -286,20 +279,6 @@ export function SessionModal({
           <Button variant={entry.done ? 'success' : 'primary'} className="w-full" onClick={() => onToggleDone(weekId, dayAbbr)}>
             {entry.done ? '✓ Completed — tap to undo' : 'Mark complete'}
           </Button>
-
-          {entry.done && ['LONG', 'WORKOUT', 'EASY'].includes(day.type) && (
-            <div className="mt-6">
-              <PostRunSummaryCard
-                weekId={weekId}
-                dayAbbr={dayAbbr}
-                day={day}
-                entry={entry}
-                runDetail={lastRun && lastRun.date === day.date ? lastRun : null}
-                activitySummary={stravaActivities?.[day.date]}
-                onContinueInCoach={onContinueInCoach}
-              />
-            </div>
-          )}
         </>
     </Sheet>
   );
