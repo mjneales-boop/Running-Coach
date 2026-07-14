@@ -238,13 +238,14 @@ export async function removeAllowedEmail(email: string): Promise<void> {
 }
 
 export async function updateProfile(patch: ProfilePatch): Promise<void> {
-  // Explicit WHERE: the project rejects unfiltered UPDATEs (RLS scoping alone
-  // is not enough — Postgres error 21000).
-  const { data, error } = await supabase
+  // Upsert, not update: a profile row is normally created by the handle_new_user
+  // trigger at signup, but if it's missing (row deleted during testing, or the
+  // trigger didn't fire) a plain UPDATE matches nothing and onboarding dead-ends
+  // with "profile update matched no row". Upserting on the id self-heals that.
+  // RLS still restricts it to the user's own row (check id = auth.uid()), so a
+  // stale/empty id is rejected rather than writing a bogus row.
+  const { error } = await supabase
     .from('profiles')
-    .update(patch)
-    .eq('id', getCurrentUserId())
-    .select('id');
+    .upsert({ id: getCurrentUserId(), ...patch }, { onConflict: 'id' });
   if (error) throw error;
-  if (!data?.length) throw new Error('profile update matched no row');
 }
