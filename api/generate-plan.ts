@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyUser } from '../lib/verifyUser.js';
 import { generatedPlanSchema, CANONICAL_ZONES, type GeneratedPlan } from '../lib/planSchema.js';
+import { computeZones } from '../lib/paceCalc.js';
 import { buildSessionGuide } from '../src/lib/sessionGuides.js';
 import type { Week } from '../src/types/index.js';
 
@@ -20,6 +21,7 @@ interface ProfileRow {
   weekly_km_current: number | null;
   days_per_week: number | null;
   long_run_day: string | null;
+  max_hr: number | null;
   injury_history: string | null;
   recent_race_times: { distance: string; time: string }[] | null;
   include_strength: boolean | null;
@@ -73,29 +75,14 @@ ${strengthDays > 0 ? `- The athlete wants EXACTLY ${strengthDays} gym/strength s
 
 ${guideReferenceText()}
 
-## Pace calibration (GET THIS RIGHT — it defines the whole plan)
+## Pace zones (PRE-CALCULATED — use them verbatim, never invent paces)
 
-Every pace in the plan derives from ONE anchor: the athlete's current threshold pace T (their sustainable ~1-hour / 15K–half-marathon race effort). Establish T first, then offset every zone from it. Do NOT pick easy pace as an independent "slow" number — a mis-anchored easy pace is the most common way these plans fail.
+The athlete's pace zones have ALREADY been computed for you from their fitness and are provided in the input JSON as \`paceZones\` (an array of {name, pace, hr}). These are authoritative. You MUST:
+- Use \`paceZones\` as the plan's \`zones\` output exactly as given — same names, same order, same pace strings.
+- Pace EVERY running session from this table: each session's \`pace\` must be the pace string of the appropriate zone (e.g. an easy run uses the "Easy" zone's pace, a Sub-T workout uses the "Sub-T" zone's pace, a long run uses "Easy" or "Steady"). Do not compute or estimate any pace yourself — copy from the table.
+- The input also gives \`predictedMarathonPace\`; use it as \`goalPace\` unless the athlete stated a specific race goal time you should honour instead.
 
-Step 1 — find T:
-- If recent race times are given, compute T from the sharpest one (T ≈ 5K pace + 12–18 s/km ≈ 10K pace + 6–10 s/km ≈ half-marathon pace − 5 s/km). Race times are the reliable signal — always prefer them.
-- If NO race times, estimate T from experience + CURRENT WEEKLY VOLUME. A runner who has sustained that volume for months is AT LEAST this fit — do not under-estimate:
-  * Beginner, under 25 km/wk → T ≈ 5:30–6:00/km
-  * Intermediate, 25–45 km/wk → T ≈ 4:45–5:15/km
-  * Advanced, 45–70 km/wk → T ≈ 4:00–4:30/km
-  * Advanced, 70+ km/wk → T ≈ 3:30–4:00/km
-  Sanity check: a seasoned/advanced runner on ~50 km/wk is roughly a 4:00–4:30/km threshold runner — NEVER a 6:00–7:00/km one. If your easy pace lands slower than ~6:00/km for such an athlete, you have anchored wrong — redo it.
-
-Step 2 — derive zones as offsets from T (this ordering must always hold: VO2 fastest → Recovery slowest):
-- VO2 / CV: T − 15 to −25 s/km
-- Threshold: ≈ T
-- Sub-T: T + 8 to +15 s/km
-- Marathon (MP): T + 20 to +35 s/km
-- Steady: T + 35 to +50 s/km
-- Easy: T + 60 to +90 s/km
-- Recovery: T + 90 to +120 s/km
-
-Easy pace is a RANGE that scales with fitness, never a fixed slow value. Example: an advanced 50 km/wk runner with T≈4:15/km runs easy at ~5:15–5:45/km. "Conservative" applies to VOLUME (ramp rate, injury caution) — NOT to pace anchoring.
+Do NOT recalculate, "round", or second-guess these paces — they are correct by construction. Your job is to choose the right SESSIONS and structure, and assign each one the right zone from the table.
 
 ## Output format
 
@@ -114,7 +101,7 @@ Hard rules:
 - Weeks run Monday→Sunday. Every week has exactly 7 day entries in order mon,tue,wed,thu,fri,sat,sun. Rest days are type REST with title "Rest".
 - Day types: LONG (long run), WORKOUT (quality session), EASY, BIKE, REST${mode === 'race' ? ', RACE (race day only)' : ''}.
 - WORKOUT titles MUST name the session kind explicitly using one of: "Sub-T", "Threshold", "CV", "Steady", "Hill sprints" (e.g. "Sub-T 5×6min @ 5:10"). LONG runs with goal-pace segments must include "MP" in the title.
-- zones: exactly these 7 names in this order: ${CANONICAL_ZONES.join(', ')}. Mark the race-pace zone with "hero": true. Derive every pace from the athlete's threshold pace T using the PACE CALIBRATION section above — anchor T from race times if given, else from the experience+volume table, and never lowball a high-volume athlete's fitness.
+- zones: output the provided \`paceZones\` array verbatim — exactly these 7 names in this order: ${CANONICAL_ZONES.join(', ')}, with the pace and hr strings copied from \`paceZones\` and "hero": true on the same zone the input marks. Do not alter the paces.
 - goalPace: the athlete's target race pace in min/km (m:ss)${mode === 'general' ? ' — in general mode, set it to a realistic current marathon-effort pace to anchor the zones' : ''}.
 - For the main quality session of each week, include "chartPace": {"category": "subThreshold"|"threshold"|"marathonPace"|"intro", "secPerKm": N} so progress charts can plot workout pace.
 - targetKm is the planned weekly running volume in km; it must match the sum of the running distances that week (±2km).
@@ -176,7 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select(
-        'age, weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, long_run_day, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
+        'age, weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, long_run_day, max_hr, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
       )
       .maybeSingle<ProfileRow>();
     if (profErr) throw profErr;
@@ -281,15 +268,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     }
 
+    // Deterministic pace zones — computed in code, not guessed by the model.
+    // The model must copy these verbatim and pace every session from them.
+    const computed = computeZones({
+      raceTimes: profile.recent_race_times,
+      experience: profile.experience,
+      weeklyKm: profile.weekly_km_current,
+      age: profile.age,
+      maxHr: profile.max_hr,
+    });
+    userContext = {
+      ...userContext,
+      paceZones: computed.zones,
+      predictedMarathonPace: `${Math.floor(computed.marathonPaceSecPerKm / 60)}:${String(computed.marathonPaceSecPerKm % 60).padStart(2, '0')}`,
+    };
+
     const system = systemPrompt(mode, strengthDays);
     const messages: Anthropic.MessageParam[] = [
       { role: 'user', content: `ATHLETE (JSON):\n${JSON.stringify(userContext)}` },
     ];
 
-    // Diagnostic: log the exact athlete profile handed to the generator, so a
+    // Diagnostic: log the athlete profile + the computed zone basis, so a
     // successful run leaves proof of what it was built from (verifiable in the
     // Vercel runtime logs). No PII beyond what the user entered themselves.
     console.log('generate-plan athlete context', JSON.stringify(userContext.athlete));
+    console.log(
+      `generate-plan zones basis=${computed.basis} threshold=${computed.thresholdPaceSecPerKm}s/km`,
+      JSON.stringify(computed.zones),
+    );
 
     // First attempt, then one retry with the validation error fed back.
     let plan: GeneratedPlan | null = null;
@@ -322,6 +328,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('generate-plan validation failed twice', lastError.slice(0, 500));
       return res.status(422).json({ error: 'Plan generation failed validation — please try again', detail: lastError.slice(0, 500) });
     }
+
+    // Zones are authoritative from paceCalc, not the model — overwrite whatever
+    // it emitted so the stored zones are exactly the computed table (correct
+    // names, order, hero flag, formatting). Session paces already reference this
+    // table because the prompt required it.
+    plan.zones = computed.zones;
 
     const weeks: Week[] = extend ? [...previousWeeks, ...(plan.weeks as Week[])] : (plan.weeks as Week[]);
 
