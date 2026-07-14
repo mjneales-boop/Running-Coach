@@ -71,6 +71,30 @@ ${strengthDays > 0 ? `- The athlete wants EXACTLY ${strengthDays} gym/strength s
 
 ${guideReferenceText()}
 
+## Pace calibration (GET THIS RIGHT — it defines the whole plan)
+
+Every pace in the plan derives from ONE anchor: the athlete's current threshold pace T (their sustainable ~1-hour / 15K–half-marathon race effort). Establish T first, then offset every zone from it. Do NOT pick easy pace as an independent "slow" number — a mis-anchored easy pace is the most common way these plans fail.
+
+Step 1 — find T:
+- If recent race times are given, compute T from the sharpest one (T ≈ 5K pace + 12–18 s/km ≈ 10K pace + 6–10 s/km ≈ half-marathon pace − 5 s/km). Race times are the reliable signal — always prefer them.
+- If NO race times, estimate T from experience + CURRENT WEEKLY VOLUME. A runner who has sustained that volume for months is AT LEAST this fit — do not under-estimate:
+  * Beginner, under 25 km/wk → T ≈ 5:30–6:00/km
+  * Intermediate, 25–45 km/wk → T ≈ 4:45–5:15/km
+  * Advanced, 45–70 km/wk → T ≈ 4:00–4:30/km
+  * Advanced, 70+ km/wk → T ≈ 3:30–4:00/km
+  Sanity check: a seasoned/advanced runner on ~50 km/wk is roughly a 4:00–4:30/km threshold runner — NEVER a 6:00–7:00/km one. If your easy pace lands slower than ~6:00/km for such an athlete, you have anchored wrong — redo it.
+
+Step 2 — derive zones as offsets from T (this ordering must always hold: VO2 fastest → Recovery slowest):
+- VO2 / CV: T − 15 to −25 s/km
+- Threshold: ≈ T
+- Sub-T: T + 8 to +15 s/km
+- Marathon (MP): T + 20 to +35 s/km
+- Steady: T + 35 to +50 s/km
+- Easy: T + 60 to +90 s/km
+- Recovery: T + 90 to +120 s/km
+
+Easy pace is a RANGE that scales with fitness, never a fixed slow value. Example: an advanced 50 km/wk runner with T≈4:15/km runs easy at ~5:15–5:45/km. "Conservative" applies to VOLUME (ramp rate, injury caution) — NOT to pace anchoring.
+
 ## Output format
 
 Respond with ONLY a JSON object — no markdown fences, no commentary. Shape:
@@ -88,7 +112,7 @@ Hard rules:
 - Weeks run Monday→Sunday. Every week has exactly 7 day entries in order mon,tue,wed,thu,fri,sat,sun. Rest days are type REST with title "Rest".
 - Day types: LONG (long run), WORKOUT (quality session), EASY, BIKE, REST${mode === 'race' ? ', RACE (race day only)' : ''}.
 - WORKOUT titles MUST name the session kind explicitly using one of: "Sub-T", "Threshold", "CV", "Steady", "Hill sprints" (e.g. "Sub-T 5×6min @ 5:10"). LONG runs with goal-pace segments must include "MP" in the title.
-- zones: exactly these 7 names in this order: ${CANONICAL_ZONES.join(', ')}. Mark the race-pace zone with "hero": true. Derive paces from the athlete's recent race times when given; otherwise estimate conservatively from experience and current volume.
+- zones: exactly these 7 names in this order: ${CANONICAL_ZONES.join(', ')}. Mark the race-pace zone with "hero": true. Derive every pace from the athlete's threshold pace T using the PACE CALIBRATION section above — anchor T from race times if given, else from the experience+volume table, and never lowball a high-volume athlete's fitness.
 - goalPace: the athlete's target race pace in min/km (m:ss)${mode === 'general' ? ' — in general mode, set it to a realistic current marathon-effort pace to anchor the zones' : ''}.
 - For the main quality session of each week, include "chartPace": {"category": "subThreshold"|"threshold"|"marathonPace"|"intro", "secPerKm": N} so progress charts can plot workout pace.
 - targetKm is the planned weekly running volume in km; it must match the sum of the running distances that week (±2km).
