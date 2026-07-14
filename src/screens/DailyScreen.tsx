@@ -10,6 +10,7 @@ import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan } from '../hooks/usePlan';
+import { usePlanConfig } from '../hooks/usePlanConfig';
 import { useCompletion } from '../hooks/useCompletion';
 import { useReadiness } from '../hooks/useReadiness';
 import { useOura } from '../hooks/useOura';
@@ -52,8 +53,9 @@ export function DailyScreen({
 }: DailyScreenProps) {
   const today = useCurrentDate();
   const { currentWeek: rawCurrentWeek, currentPhase, daysToRace, weeks } = usePlan(today, 0);
+  const { athlete } = usePlanConfig();
   const { completion } = useCompletion();
-  const { latestEntry } = useReadiness();
+  const { latestEntry, readiness } = useReadiness();
   const { swaps } = useSwaps();
   const { gymOverrides } = useGymSchedule();
   const oura = useOura();
@@ -67,6 +69,23 @@ export function DailyScreen({
   const todaySession = useMemo(() => findTodaySession(today, currentWeek), [today, currentWeek]);
   // Once connected, a fresh account may not have synced yet — seed data keeps the card meaningful in that gap.
   const readinessEntry = latestEntry.score != null ? latestEntry : SEED_READINESS;
+  // A new user has no profile baselines (they'd show "base 0"). Derive them from
+  // their own Oura history; fall back to the latest reading so the number is never 0.
+  const baselines = useMemo(() => {
+    const vals = Object.values(readiness);
+    const avg = (pick: (e: (typeof vals)[number]) => number | undefined): number | undefined => {
+      const nums = vals.map(pick).filter((n): n is number => n != null);
+      return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : undefined;
+    };
+    return {
+      hrv: athlete.baselineHRV > 0 ? athlete.baselineHRV : Math.round(avg((e) => e.hrv) ?? readinessEntry.hrv ?? 0),
+      rhr: athlete.baselineRHR > 0 ? athlete.baselineRHR : Math.round(avg((e) => e.rhr) ?? readinessEntry.rhr ?? 0),
+      sleep:
+        athlete.baselineSleep > 0
+          ? athlete.baselineSleep
+          : Math.round((avg((e) => e.sleep) ?? readinessEntry.sleep ?? 0) * 10) / 10,
+    };
+  }, [readiness, athlete, readinessEntry]);
   const syncTimeLabel = oura.lastSynced
     ? oura.lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
@@ -125,7 +144,7 @@ export function DailyScreen({
         )}
       </div>
       {oura.connected ? (
-        <ReadinessCard variant="connected" entry={readinessEntry} />
+        <ReadinessCard variant="connected" entry={readinessEntry} baselines={baselines} />
       ) : (
         <ReadinessCard variant="not-connected" onConnect={oura.connect} />
       )}

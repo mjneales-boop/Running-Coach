@@ -187,6 +187,7 @@ export async function fetchProfile(): Promise<ProfileRow | null> {
 
 export interface ProfilePatch {
   display_name?: string;
+  age?: number | null;
   weight_kg?: number | null;
   height_cm?: number | null;
   sex?: string | null;

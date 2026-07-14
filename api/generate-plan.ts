@@ -12,6 +12,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export const config = { maxDuration: 300 };
 
 interface ProfileRow {
+  age: number | null;
   weight_kg: number | null;
   height_cm: number | null;
   sex: string | null;
@@ -38,11 +39,13 @@ function guideReferenceText(): string {
     .join('\n\n');
 }
 
-function nextMonday(from: Date): string {
+// Monday of the CURRENT calendar week, so today falls inside week 1 of the plan
+// (Mon→Sun). Starting on next Monday left a dead gap where today had no session.
+function currentWeekMonday(from: Date): string {
   const d = new Date(from);
-  const day = d.getDay(); // 0 = Sun
-  const add = day === 1 ? 7 : (8 - day) % 7 || 7;
-  d.setDate(d.getDate() + add);
+  const day = d.getDay(); // 0 = Sun, 1 = Mon
+  const diff = day === 0 ? -6 : 1 - day; // days back to this week's Monday
+  d.setDate(d.getDate() + diff);
   return d.toISOString().slice(0, 10);
 }
 
@@ -61,6 +64,7 @@ function systemPrompt(mode: 'race' | 'general', strengthDays: number): string {
 - Race mode ends with a 2-3 week taper into race day.
 - Respect the athlete's available days per week exactly — all other days are REST.
 - Respect injury history: if the athlete is injury-prone, be conservative with volume and impact; an easy bike (type BIKE) can substitute for an easy run.
+- Account for the athlete's age: masters runners (40+) recover more slowly — use a gentler volume ramp, more recovery/easy days between quality, and cap high-intensity (VO2/threshold) frequency; for 55+ be more conservative still. Younger athletes (under ~30) tolerate a steeper progression and more frequent quality.
 ${strengthDays > 0 ? `- The athlete wants EXACTLY ${strengthDays} gym/strength session${strengthDays > 1 ? 's' : ''} per week: schedule exactly ${strengthDays} per week on easy or rest days using the "gym" (display name) + "workoutId" fields. Valid workoutId values: "chestback", "shouldersarms", "legs". Include "legs" at least once${strengthDays > 1 ? ' each week' : ''}. Never schedule more or fewer than ${strengthDays}.` : '- The athlete does NOT want gym days: never set the gym or workoutId fields.'}
 
 ## Session-guide reference (the coach's voice — your sessions MUST be consistent with these definitions)
@@ -143,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select(
-        'weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
+        'age, weight_kg, height_cm, sex, experience, weekly_km_current, days_per_week, injury_history, recent_race_times, include_strength, strength_days, race_name, race_date, race_time, goal_time',
       )
       .maybeSingle<ProfileRow>();
     if (profErr) throw profErr;
@@ -165,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
-    const startDate = nextMonday(today);
+    const startDate = currentWeekMonday(today);
 
     let mode: 'race' | 'general' = profile.race_name && profile.race_date ? 'race' : 'general';
     let previousWeeks: Week[] = [];
@@ -173,6 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       today: todayStr,
       planStartDate: startDate,
       athlete: {
+        age: profile.age,
         weightKg: profile.weight_kg,
         heightCm: profile.height_cm,
         sex: profile.sex,

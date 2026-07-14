@@ -1,9 +1,20 @@
-interface ScreenHeaderProps {
-  onAvatarClick: () => void;
-  initials?: string;
+import { usePlanConfigOptional } from '../../hooks/usePlanConfig';
+
+/** First+last initial (or first two letters of a single name). */
+function toInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'ST';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function ScreenHeader({ onAvatarClick, initials = 'MX' }: ScreenHeaderProps) {
+interface ScreenHeaderProps {
+  onAvatarClick: () => void;
+}
+
+export function ScreenHeader({ onAvatarClick }: ScreenHeaderProps) {
+  const plan = usePlanConfigOptional();
+  const initials = toInitials(plan?.athlete.name ?? '');
   return (
     <div
       className="flex items-center justify-between pb-5"

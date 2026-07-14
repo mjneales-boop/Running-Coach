@@ -14,6 +14,8 @@ interface RaceTime {
 }
 
 interface FormState {
+  name: string;
+  age: string;
   weight: string;
   height: string;
   sex: 'male' | 'female' | 'other';
@@ -31,6 +33,8 @@ interface FormState {
 }
 
 const INITIAL: FormState = {
+  name: '',
+  age: '',
   weight: '',
   height: '',
   sex: 'male',
@@ -71,6 +75,7 @@ export function OnboardingScreen() {
     setForm((f) => ({ ...f, [key]: value }));
 
   const canContinue = (): boolean => {
+    if (step === 0) return form.name.trim() !== '' && Number(form.age) >= 10 && Number(form.age) <= 100;
     if (step === 1) return Number(form.weeklyKm) > 0 && Number(form.daysPerWeek) >= 2;
     if (step === 2 && form.goal === 'race') return form.raceName.trim() !== '' && form.raceDate !== '';
     return true;
@@ -98,6 +103,8 @@ export function OnboardingScreen() {
     setError(null);
     try {
       await updateProfile({
+        display_name: form.name.trim() || undefined,
+        age: form.age ? Number(form.age) : null,
         weight_kg: form.weight ? Number(form.weight) : null,
         height_cm: form.height ? Number(form.height) : null,
         sex: form.sex,
@@ -204,6 +211,12 @@ export function OnboardingScreen() {
       <div className="stride-rise rounded-card border border-hairline bg-surface p-5">
         {step === 0 && (
           <>
+            <Field label="Name">
+              <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Alex" autoCapitalize="words" className={inputClass} />
+            </Field>
+            <Field label="Age">
+              <input inputMode="numeric" value={form.age} onChange={(e) => set('age', e.target.value)} placeholder="34" className={inputClass} />
+            </Field>
             <Field label="Weight (kg)">
               <input inputMode="decimal" value={form.weight} onChange={(e) => set('weight', e.target.value)} placeholder="70" className={inputClass} />
             </Field>

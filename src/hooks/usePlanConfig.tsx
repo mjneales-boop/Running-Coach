@@ -131,3 +131,8 @@ export function usePlanConfig(): PlanConfig {
   if (!ctx) throw new Error('usePlanConfig must be used within PlanProvider');
   return ctx;
 }
+
+/** Non-throwing variant for chrome that may render outside PlanProvider (e.g. the ?uikit demo). */
+export function usePlanConfigOptional(): PlanConfig | null {
+  return useContext(PlanContext);
+}

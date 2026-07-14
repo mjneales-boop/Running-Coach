@@ -27,6 +27,8 @@ function Metric({ label, value, unit, baseline, isFirst }: MetricProps) {
 interface ReadinessCardConnectedProps {
   variant: 'connected';
   entry: ReadinessEntry;
+  /** Effective baselines (profile baseline, or derived from Oura history for new users). */
+  baselines?: { hrv: number; rhr: number; sleep: number };
 }
 
 interface ReadinessCardNotConnectedProps {
@@ -61,6 +63,11 @@ export function ReadinessCard(props: ReadinessCardProps) {
 
   const { entry } = props;
   const { headline, sub } = readinessHeadline(entry.score);
+  const baselines = props.baselines ?? {
+    hrv: athlete.baselineHRV,
+    rhr: athlete.baselineRHR,
+    sleep: athlete.baselineSleep,
+  };
 
   return (
     <div className="stride-rise mb-[26px] rounded-[18px] border border-hairline bg-surface p-[22px]">
@@ -77,9 +84,9 @@ export function ReadinessCard(props: ReadinessCardProps) {
         </div>
       </div>
       <div className="grid grid-cols-3 gap-0.5 border-t border-hairline">
-        <Metric label="HRV" value={entry.hrv} unit="ms" baseline={athlete.baselineHRV} isFirst />
-        <Metric label="RHR" value={entry.rhr} unit="bpm" baseline={athlete.baselineRHR} />
-        <Metric label="Sleep" value={entry.sleep} unit="h" baseline={athlete.baselineSleep} />
+        <Metric label="HRV" value={entry.hrv} unit="ms" baseline={baselines.hrv} isFirst />
+        <Metric label="RHR" value={entry.rhr} unit="bpm" baseline={baselines.rhr} />
+        <Metric label="Sleep" value={entry.sleep} unit="h" baseline={baselines.sleep} />
       </div>
     </div>
   );

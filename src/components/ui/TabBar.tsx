@@ -76,7 +76,12 @@ interface TabBarProps {
 
 export function TabBar({ active, onChange }: TabBarProps) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 flex h-[calc(92px+env(safe-area-inset-bottom))] items-start gap-0 border-t border-hairline bg-[rgba(10,12,14,0.82)] px-2.5 pt-3.5 backdrop-blur-xl">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-10 flex h-[calc(92px+env(safe-area-inset-bottom))] items-start gap-0 border-t border-hairline bg-[rgba(10,12,14,0.82)] px-2.5 pt-3.5 backdrop-blur-xl"
+      // Own compositor layer — stops iOS Safari from drifting this fixed +
+      // backdrop-blurred bar to mid-screen during momentum scroll.
+      style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+    >
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
