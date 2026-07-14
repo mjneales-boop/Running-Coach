@@ -204,6 +204,37 @@ export interface ProfilePatch {
   goal_pace?: string | null;
 }
 
+// ---------- signup allowlist (admin only — RLS `allowlist_admin`) ----------
+
+export interface AllowedEmail {
+  email: string;
+  added_at: string | null;
+}
+
+export async function fetchAllowlist(): Promise<AllowedEmail[]> {
+  const { data, error } = await supabase
+    .from('allowed_emails')
+    .select('email, added_at')
+    .order('added_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as AllowedEmail[];
+}
+
+export async function addAllowedEmail(email: string): Promise<void> {
+  const { error } = await supabase
+    .from('allowed_emails')
+    .upsert({ email: email.trim().toLowerCase() }, { onConflict: 'email' });
+  if (error) throw error;
+}
+
+export async function removeAllowedEmail(email: string): Promise<void> {
+  const { error } = await supabase
+    .from('allowed_emails')
+    .delete()
+    .eq('email', email.trim().toLowerCase());
+  if (error) throw error;
+}
+
 export async function updateProfile(patch: ProfilePatch): Promise<void> {
   // Explicit WHERE: the project rejects unfiltered UPDATEs (RLS scoping alone
   // is not enough — Postgres error 21000).

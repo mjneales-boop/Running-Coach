@@ -9,6 +9,7 @@ import { useStrava } from '../hooks/useStrava';
 import { useSettings } from '../hooks/useSettings';
 import { usePlanConfig } from '../hooks/usePlanConfig';
 import { useAuth } from '../hooks/useAuth';
+import { AdminAllowlist } from '../components/settings/AdminAllowlist';
 
 function raceShortName(name: string) {
   return name.replace(/^EDP\s+/i, '').replace(/\s+\d{4}$/, '');
@@ -133,7 +134,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const oura = useOura();
   const strava = useStrava();
   const { settings, update } = useSettings();
-  const { weeks, race, athlete, isRace } = usePlanConfig();
+  const { weeks, race, athlete, isRace, isAdmin } = usePlanConfig();
   const { session, signOut } = useAuth();
 
   const planWeeks = weeks.filter((w) => w.phase !== 0).length;
@@ -288,6 +289,8 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           <ToggleSwitch checked={settings.notifCoach} onChange={(v) => update({ notifCoach: v })} />
         </div>
       </SettingsSection>
+
+      {isAdmin && <AdminAllowlist ownerEmail={session?.user.email} />}
 
       <SettingsSection title="Account">
         <SettingsRow label="Subscription" value={<span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent">STRIDE Pro</span>} />

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyUser } from '../lib/verifyUser.js';
 
@@ -43,6 +44,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array required' });
+    }
+
+    // User-scoped client (RLS: coach_messages.user_id = auth.uid()). Used to
+    // rate-limit and to log each user turn as the counting ledger.
+    const supa = createClient(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_ANON_KEY ?? '', {
+      global: { headers: { Authorization: req.headers.authorization ?? '' } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Rate limit: 30 user messages per hour (guards the LLM spend).
+    const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    const { count: msgsThisHour } = await supa
+      .from('coach_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'user')
+      .gte('created_at', hourAgo);
+    if ((msgsThisHour ?? 0) >= 30) {
+      return res
+        .status(429)
+        .json({ error: 'Message limit reached (30 per hour). Take a breather and try again shortly.' });
+    }
+
+    // Log this user turn (user_id defaults to auth.uid()); best-effort ledger.
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUser) {
+      await supa.from('coach_messages').insert({ role: 'user', content: lastUser.content });
     }
 
     const msg = await anthropic.messages.create({

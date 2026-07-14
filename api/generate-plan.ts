@@ -148,6 +148,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (profErr) throw profErr;
     if (!profile) return res.status(400).json({ error: 'No profile — complete onboarding first' });
 
+    // Rate limit: 3 plan generations per user per day (guards the LLM spend).
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const { count: plansToday } = await supabase
+      .from('plans')
+      .select('id', { count: 'exact', head: true })
+      .gte('generated_at', startOfDay.toISOString());
+    if ((plansToday ?? 0) >= 3) {
+      return res.status(429).json({ error: 'Daily plan limit reached (3 per day). Try again tomorrow.' });
+    }
+
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
     const startDate = nextMonday(today);
