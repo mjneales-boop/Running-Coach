@@ -194,20 +194,28 @@ export function OnboardingScreen() {
 
   return (
     <div
-      className="mx-auto min-h-dvh w-full max-w-md px-5 pb-16"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2.25rem)' }}
+      className="mx-auto flex h-[100dvh] w-full max-w-md flex-col px-5"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2.25rem)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+      }}
     >
-      <Eyebrow>Set up · step {step + 1} of 4</Eyebrow>
-      <h1
-        className="mb-7 mt-3 font-display text-[34px] font-extrabold uppercase leading-[0.95] tracking-[-0.01em]"
-        style={{ fontVariationSettings: "'wdth' 116" }}
-      >
-        {step === 0 && 'About you'}
-        {step === 1 && 'Your running'}
-        {step === 2 && 'Your goal'}
-        {step === 3 && 'Last bits'}
-      </h1>
+      {/* Header stays put; only the content below scrolls, so an open keyboard
+          overlays the fields instead of pushing the whole page up. */}
+      <div className="flex-none">
+        <Eyebrow>Set up · step {step + 1} of 4</Eyebrow>
+        <h1
+          className="mb-5 mt-3 font-display text-[34px] font-extrabold uppercase leading-[0.95] tracking-[-0.01em]"
+          style={{ fontVariationSettings: "'wdth' 116" }}
+        >
+          {step === 0 && 'About you'}
+          {step === 1 && 'Your running'}
+          {step === 2 && 'Your goal'}
+          {step === 3 && 'Last bits'}
+        </h1>
+      </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="stride-rise rounded-card border border-hairline bg-surface p-5">
         {step === 0 && (
           <>
@@ -290,7 +298,13 @@ export function OnboardingScreen() {
                   <input value={form.raceName} onChange={(e) => set('raceName', e.target.value)} placeholder="Berlin Marathon 2027" className={inputClass} />
                 </Field>
                 <Field label="Race date">
-                  <input type="date" value={form.raceDate} onChange={(e) => set('raceDate', e.target.value)} className={inputClass} />
+                  <input
+                    type="date"
+                    value={form.raceDate}
+                    onChange={(e) => set('raceDate', e.target.value)}
+                    className={`${inputClass} block min-w-0 appearance-none`}
+                    style={{ WebkitAppearance: 'none' }}
+                  />
                 </Field>
                 <Field label="Goal time">
                   <input
@@ -381,15 +395,16 @@ export function OnboardingScreen() {
           {error}
         </p>
       )}
+      </div>
 
-      <div className="mt-6 flex gap-3">
+      <div className="mt-4 flex flex-none gap-3">
         {step > 0 && (
-          <Button variant="ghost" className="flex-1" onClick={() => setStep((s) => (s - 1) as Step)}>
+          <Button variant="ghost" className="flex-1" onClick={() => { setError(null); setStep((s) => (s - 1) as Step); }}>
             Back
           </Button>
         )}
         {step < 3 ? (
-          <Button className="flex-1" disabled={!canContinue()} onClick={() => setStep((s) => (s + 1) as Step)}>
+          <Button className="flex-1" disabled={!canContinue()} onClick={() => { setError(null); setStep((s) => (s + 1) as Step); }}>
             Continue
           </Button>
         ) : (
