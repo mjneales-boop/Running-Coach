@@ -5,6 +5,7 @@ import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { StatRow } from '../components/progress/StatRow';
 import { VolumeBarChart } from '../components/progress/VolumeBarChart';
 import { PaceLineChart } from '../components/progress/PaceLineChart';
+import { HrEfficiencyChart } from '../components/progress/HrEfficiencyChart';
 import { TopLiftsList } from '../components/progress/TopLiftsList';
 import { StrengthView } from '../components/StrengthView';
 import { Sheet } from '../components/ui/Sheet';
@@ -15,12 +16,16 @@ import { useCompletion } from '../hooks/useCompletion';
 import { useStrength } from '../hooks/useStrength';
 import { useStorage } from '../hooks/useStorage';
 import { buildProgressStats, buildPaceProgression } from '../lib/logic';
+import { buildHrEfficiency } from '../lib/hrEfficiency';
 import { topLifts } from '../lib/strength';
 import type { StravaActivity } from '../types';
 
 function localDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+
+// Matches Strava's own history cap, which is what the first sync pulls (useAutoSync).
+const HR_WINDOW_DAYS = 90;
 
 function parsePace(pace: string): number {
   const [m, s] = pace.split(':').map(Number);
@@ -51,6 +56,10 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
     [weeks, stravaActivities, zones, race.goalPace],
   );
   const lifts = useMemo(() => topLifts(strength, localDateKey(today)), [strength, today]);
+  const hrEfficiency = useMemo(
+    () => buildHrEfficiency(Object.values(stravaActivities), zones, HR_WINDOW_DAYS, today),
+    [stravaActivities, zones, today],
+  );
 
   return (
     <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">
@@ -76,6 +85,7 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
 
       <VolumeBarChart volume={stats.volume} />
       <PaceLineChart pace={pace} goalPaceMin={parsePace(race.goalPace)} />
+      <HrEfficiencyChart zones={hrEfficiency} windowDays={HR_WINDOW_DAYS} />
       <TopLiftsList lifts={lifts} onOpenInsights={() => setInsightsOpen(true)} />
 
       <TabBar active={activeTab} onChange={onTabChange} />

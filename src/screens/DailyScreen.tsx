@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { HeroCountdown } from '../components/daily/HeroCountdown';
 import { SessionCard } from '../components/daily/SessionCard';
 import { ReadinessCard } from '../components/daily/ReadinessCard';
@@ -28,7 +28,13 @@ import {
   applySwapsToWeek,
   applyGymOverrides,
   findTodaySession,
+  zoneForPace,
 } from '../lib/logic';
+import { buildHrEfficiency } from '../lib/hrEfficiency';
+import { HrEfficiencyStrip } from '../components/daily/HrEfficiencyStrip';
+
+// Kept in step with ProgressScreen's window so both surfaces describe the same trend.
+const HR_WINDOW_DAYS = 90;
 
 function weekdayShort(dateStr: string) {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' });
@@ -58,7 +64,7 @@ export function DailyScreen({
 }: DailyScreenProps) {
   const today = useCurrentDate();
   const { currentWeek: rawCurrentWeek, currentPhase, daysToRace, weeks } = usePlan(today, 0);
-  const { athlete } = usePlanConfig();
+  const { athlete, zones } = usePlanConfig();
   const { completion } = useCompletion();
   const { latestEntry, readiness } = useReadiness();
   const { swaps } = useSwaps();
@@ -68,11 +74,30 @@ export function DailyScreen({
   const lastRun = useLastRun(strava.connected);
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
 
+  // Bypasses both throttles (useLastRun's 15-min window and useAutoSync's) — the post-run
+  // card calls this when it's waiting on a run that just finished, where "come back in 15
+  // minutes" is exactly the wrong behaviour.
+  const { refresh: refreshLastRun } = lastRun;
+  const { sync: syncStrava } = strava;
+  const refreshRunData = useCallback(async () => {
+    await Promise.allSettled([refreshLastRun(), syncStrava(7)]);
+  }, [refreshLastRun, syncStrava]);
+
   const currentWeek = useMemo(
     () => applyGymOverrides(applySwapsToWeek(rawCurrentWeek, swaps[rawCurrentWeek.id] ?? {}), gymOverrides),
     [rawCurrentWeek, swaps, gymOverrides],
   );
   const todaySession = useMemo(() => findTodaySession(today, currentWeek), [today, currentWeek]);
+
+  // Show the efficiency trend for the zone today's session actually calls for, so the
+  // number on screen is the one that's about to be tested. Falls back to the most-run
+  // zone (buildHrEfficiency sorts by run count) on rest days or unmatched sessions.
+  const todayEfficiency = useMemo(() => {
+    const byZone = buildHrEfficiency(Object.values(stravaActivities), zones, HR_WINDOW_DAYS, today);
+    if (!byZone.length) return null;
+    const intended = todaySession ? zoneForPace(todaySession.pace, zones) : undefined;
+    return byZone.find((z) => z.zone === intended?.name) ?? byZone[0];
+  }, [stravaActivities, zones, today, todaySession]);
   // Use the athlete's own reading only — never the seed (owner's) numbers. Before
   // the first sync this is empty and the card shows "—" rather than fake data.
   const readinessEntry = latestEntry;
@@ -147,6 +172,8 @@ export function DailyScreen({
           entry={completion[`${currentWeek.id}-${todaySession.d}`] ?? { done: true }}
           runDetail={lastRun.run && lastRun.run.date === todaySession.date ? lastRun.run : null}
           activitySummary={stravaActivities[todaySession.date]}
+          stravaConnected={strava.connected}
+          onRefreshRunData={refreshRunData}
           onContinueInCoach={onContinueInCoach}
         />
       )}
@@ -186,6 +213,8 @@ export function DailyScreen({
         <Eyebrow>Last run</Eyebrow>
       </div>
       <LastRunCard run={lastRun.run} loading={lastRun.loading} error={lastRun.error} />
+
+      <HrEfficiencyStrip efficiency={todayEfficiency} windowDays={HR_WINDOW_DAYS} />
 
       <div className="stride-rise mb-3.5 flex items-baseline justify-between">
         <Eyebrow>Strength</Eyebrow>

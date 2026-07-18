@@ -104,7 +104,9 @@ export function topLifts(
       exerciseId,
       name: exerciseName(exerciseId),
       weight: last.weight,
-      delta: prev ? last.weight - prev.weight : undefined,
+      // Rounded at source: plate weights are decimals (68.2 - 78 = -9.79999999999999
+      // in binary floating point), and every consumer wants the same 0.1 kg precision.
+      delta: prev ? Math.round((last.weight - prev.weight) * 10) / 10 : undefined,
     });
   }
 
