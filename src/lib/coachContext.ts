@@ -92,8 +92,17 @@ export interface CoachContext {
   upcoming: { date: string; weekday: string; type: string; title: string; km?: number; pace?: string; guide?: GuideSummary[] }[];
   /** Actual logged runs from Strava over the last 30 days, most recent first — real
    *  pace/HR/distance, not just the plan. `daysAgo` is relative to `today` (0 = today,
-   *  1 = yesterday) so the coach can judge recency. */
-  recentRuns: { date: string; daysAgo: number; distanceKm: number; avgPaceMinKm: number; avgHR?: number }[];
+   *  1 = yesterday) so the coach can judge recency. `plannedSession` names the plan
+   *  session that fell on that date, so "my long run" resolves to the right activity
+   *  instead of the coach guessing from distance. */
+  recentRuns: {
+    date: string;
+    daysAgo: number;
+    distanceKm: number;
+    avgPaceMinKm: number;
+    avgHR?: number;
+    plannedSession: { type: string; title: string; km?: number; pace?: string } | null;
+  }[];
   /** The whole plan as a lightweight skeleton (no per-session guide text) so the coach can
    *  locate any day/week by date — today's + near-term sessions still carry full guide detail
    *  in `today`/`upcoming`. */
@@ -166,6 +175,7 @@ export function buildCoachContext(
   const r = readinessEntry;
   const { headline } = readinessHeadline(r.score);
   const activities = Object.values(stravaActivities).sort((a, b) => b.date.localeCompare(a.date));
+  const dayByDate = new Map(weeks.flatMap((w) => w.days).map((d) => [d.date, d]));
   const progress = buildProgressStats(weeks, completion, weekIndex, peakKm);
   const recentWeeks = progress.volume
     .filter((v) => !v.isPlanned)
@@ -226,13 +236,19 @@ export function buildCoachContext(
     upcoming: upcomingDays(today, weeks, plan.sessionGuide),
     recentRuns: activities
       .filter((a) => daysAgoFrom(today, a.date) <= 30)
-      .map((a) => ({
-        date: a.date,
-        daysAgo: daysAgoFrom(today, a.date),
-        distanceKm: a.distanceKm,
-        avgPaceMinKm: a.avgPaceMinKm,
-        avgHR: a.avgHR,
-      })),
+      .map((a) => {
+        const planned = dayByDate.get(a.date);
+        return {
+          date: a.date,
+          daysAgo: daysAgoFrom(today, a.date),
+          distanceKm: a.distanceKm,
+          avgPaceMinKm: a.avgPaceMinKm,
+          avgHR: a.avgHR,
+          plannedSession: planned
+            ? { type: planned.type, title: planned.title, km: planned.km, pace: planned.pace }
+            : null,
+        };
+      }),
     fullPlan: {
       weeks: weeks
         .filter((w) => w.phase !== 0)

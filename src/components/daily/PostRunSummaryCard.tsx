@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Tag } from '../ui/Tag';
 import { Button } from '../ui/Button';
 import { usePlanConfig } from '../../hooks/usePlanConfig';
 import { useReadiness } from '../../hooks/useReadiness';
 import { useRunSummaries } from '../../hooks/useRunSummaries';
+import { useSwaps } from '../../hooks/useSwaps';
+import { useGymSchedule } from '../../hooks/useGymSchedule';
+import { applyPlanOverrides } from '../../lib/logic';
 import { buildRunSummaryContext } from '../../lib/coachContext';
 import { authFetch } from '../../lib/authFetch';
 import type { CompletionEntry, Day, DayAbbr, StravaActivity, StravaRunDetail } from '../../types';
@@ -44,9 +47,17 @@ export function PostRunSummaryCard({
   onRefreshRunData,
   onContinueInCoach,
 }: PostRunSummaryCardProps) {
-  const plan = usePlanConfig();
+  const rawPlan = usePlanConfig();
   const { readiness } = useReadiness();
   const { summaries, saveSummary } = useRunSummaries();
+  const { swaps } = useSwaps();
+  const { gymOverrides } = useGymSchedule();
+  // Swapped weeks matter here for "what's next" — the debrief closes by naming tomorrow's
+  // session, which must be the one the athlete will actually see on Daily.
+  const plan = useMemo(
+    () => ({ ...rawPlan, weeks: applyPlanOverrides(rawPlan.weeks, swaps, gymOverrides) }),
+    [rawPlan, swaps, gymOverrides],
+  );
 
   const sessionKey = `${weekId}-${dayAbbr}`;
   const cached = summaries[sessionKey];

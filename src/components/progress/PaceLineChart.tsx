@@ -22,7 +22,9 @@ export function PaceLineChart({ pace, goalPaceMin }: PaceLineChartProps) {
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">min/km</span>
       </div>
       <div className="mb-4 font-mono text-[10.5px] tracking-[0.02em] text-muted">
-        Lower = fitter · trending toward MP {race.goalPace}
+        {/* The Y axis is reversed (faster pace plots higher), so describe the line the way
+            it reads on screen — "lower = fitter" is true of the number, not the graph. */}
+        Higher = faster · climbing toward MP {race.goalPace}
       </div>
       <div className="h-[160px]">
         <ResponsiveContainer width="100%" height="100%">

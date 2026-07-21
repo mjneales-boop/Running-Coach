@@ -1,4 +1,4 @@
-import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, GymOverrides, Zone, StravaActivity } from '../types';
+import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, SwapStore, GymOverrides, Zone, StravaActivity } from '../types';
 
 /** Structural subset of PlanConfig.athlete — anything with baselines works. */
 export interface AthleteBaselines {
@@ -152,6 +152,16 @@ export function applyGymOverrides(week: Week, overrides: GymOverrides): Week {
   return { ...week, days };
 }
 
+/**
+ * The plan as the athlete actually sees it: every week with its swaps and gym overrides
+ * applied. Daily/Full Plan resolve this per-week at render time; anything that reasons
+ * about the whole plan (the coach context, notably) must go through here — otherwise it
+ * reads the raw generated plan and reports the wrong session on any swapped day.
+ */
+export function applyPlanOverrides(weeks: Week[], swaps: SwapStore, gymOverrides: GymOverrides): Week[] {
+  return weeks.map((w) => applyGymOverrides(applySwapsToWeek(w, swaps[w.id] ?? {}), gymOverrides));
+}
+
 export function nextNonRestDay(today: Date, week: Week, allWeeks?: Week[]): Day | undefined {
   const t = localDateStr(today);
   const inWeek = week.days.find((d) => d.date > t && d.type !== 'REST');
@@ -280,7 +290,10 @@ export function readinessSecondaryWarnings(
 export interface WeekVolumePoint {
   weekId: string;
   label: string;
+  /** Km actually completed. 0 for weeks that haven't happened yet. */
   km: number;
+  /** The week's planned target — drawn as the outline the completed bar fills toward. */
+  targetKm: number;
   isPlanned: boolean;
   isCurrent: boolean;
 }
@@ -298,11 +311,17 @@ export function buildProgressStats(
   currentWeekIndex: number,
   peakKm: number,
 ): ProgressStats {
-  const volume: WeekVolumePoint[] = weeks.map((w, i) => {
-    const isPlanned = i > currentWeekIndex;
-    const km = isPlanned ? w.targetKm : weeklyKmDone(w, completion);
-    return { weekId: w.id, label: w.num, km, isPlanned, isCurrent: i === currentWeekIndex };
-  });
+  // `km` is always what was actually run — future weeks are 0, not their target. The chart
+  // draws the target as an outline the completed bar fills, so a half-done current week
+  // reads as half-full rather than as a finished week of that height.
+  const volume: WeekVolumePoint[] = weeks.map((w, i) => ({
+    weekId: w.id,
+    label: w.num,
+    km: i > currentWeekIndex ? 0 : weeklyKmDone(w, completion),
+    targetKm: w.targetKm,
+    isPlanned: i > currentWeekIndex,
+    isCurrent: i === currentWeekIndex,
+  }));
 
   const windowStart = Math.max(0, currentWeekIndex - 3);
   const window = volume.slice(windowStart, currentWeekIndex + 1);
