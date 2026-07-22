@@ -66,7 +66,7 @@ export const WORKOUTS: Record<string, WorkoutTemplate> = {
         name: 'Main',
         exercises: [
           { id: 'db-shoulder-press',   name: 'DB Shoulder Press',          sets: 4, reps: '8–12', unit: 'kg', tracked: true },
-          { id: 'cable-lat-raise',     name: 'Cable Lateral Raises',       sets: 4, reps: '8–12', unit: 'kg', tracked: true },
+          { id: 'db-lat-raise',        name: 'DB Lateral Raises',          sets: 4, reps: '8–12', unit: 'kg', tracked: true },
           { id: 'tricep-bar-pushdown', name: 'Tricep Bar Pushdown',        sets: 4, reps: '8–12', unit: 'kg', tracked: true },
           { id: 'bicep-curl',          name: 'Bicep Curls',                sets: 4, reps: '8–12', unit: 'kg', tracked: true },
           { id: 'sa-tricep-pushdown',  name: 'Single-Arm Tricep Pushdown', sets: 4, reps: '8–12', unit: 'kg', tracked: true },
@@ -81,6 +81,7 @@ export const WORKOUTS: Record<string, WorkoutTemplate> = {
       },
     ],
     alternatives: [
+      { id: 'cable-lat-raise',       name: 'Cable Lateral Raises',       sets: 4, reps: '8–12', unit: 'kg', tracked: true },
       { id: 'cable-bar-bicep-curls', name: 'Cable Bar Bicep Curls',      sets: 4, reps: '8–12', unit: 'kg', tracked: true },
       { id: 'overhead-tricep-ext',   name: 'Overhead Tricep Extension',  sets: 4, reps: '8–12', unit: 'kg', tracked: true },
     ],
