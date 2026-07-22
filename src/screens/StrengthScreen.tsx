@@ -3,7 +3,6 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { ExerciseAccordion } from '../components/strength/ExerciseAccordion';
-import { RecentHistoryList } from '../components/strength/RecentHistoryList';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan } from '../hooks/usePlan';
 import { useSwaps } from '../hooks/useSwaps';
@@ -114,8 +113,6 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
     );
   }
 
-  const primaryExercise = exercises[0];
-
   return (
     <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">
       <ScreenHeader onAvatarClick={onOpenSettings} />
@@ -165,6 +162,7 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
         {exercises.map((exercise) => {
           const sets = log?.exercises[exercise.id] ?? [];
           const pr = allTimePR(strength, exercise.id);
+          const recent = recentLogsSummary(strength, exercise.id, todayStr).slice(0, 3);
           const done = log?.exerciseDone?.[exercise.id] ?? false;
           const alternatives = workout.alternatives.filter((alt) => !exercises.some((ex) => ex.id === alt.id));
           return (
@@ -173,6 +171,7 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
               exercise={exercise}
               sets={sets}
               pr={pr}
+              recent={recent}
               done={done}
               open={effectiveOpenId === exercise.id}
               onToggleOpen={() => setOpenId(effectiveOpenId === exercise.id ? '' : exercise.id)}
@@ -185,16 +184,6 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
           );
         })}
       </div>
-
-      {primaryExercise && (
-        <>
-          <div className="stride-rise mb-1 mt-[26px] flex items-baseline justify-between">
-            <Eyebrow>Recent</Eyebrow>
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">{primaryExercise.name}</span>
-          </div>
-          <RecentHistoryList entries={recentLogsSummary(strength, primaryExercise.id, todayStr)} />
-        </>
-      )}
 
       <TabBar active={activeTab} onChange={onTabChange} />
     </div>

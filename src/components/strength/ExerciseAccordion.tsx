@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Accordion, Chevron } from '../ui/Accordion';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { formatDateShort } from '../../lib/logic';
 import type { Exercise } from '../../constants/workouts';
 import type { SetLog } from '../../types';
 
@@ -9,6 +10,7 @@ interface ExerciseAccordionProps {
   exercise: Exercise;
   sets: SetLog[];
   pr: SetLog | undefined;
+  recent?: { date: string; summary: string }[];
   done: boolean;
   open: boolean;
   onToggleOpen: () => void;
@@ -73,6 +75,7 @@ export function ExerciseAccordion({
   exercise,
   sets,
   pr,
+  recent = [],
   done,
   open,
   onToggleOpen,
@@ -105,17 +108,34 @@ export function ExerciseAccordion({
           </>
         }
       >
-        {(pr || topSetValue != null) && (
-          <div className="mb-3.5 flex items-center gap-4 border-y border-hairline py-3 font-mono text-[11px] uppercase tracking-[0.08em]">
-            {pr && (
-              <span className="text-faint">
-                PR <span className="text-ink">{pr.weight} kg × {pr.reps}</span>
-              </span>
+        {(pr || topSetValue != null || recent.length > 0) && (
+          <div className="mb-3.5 border-y border-hairline">
+            {(pr || topSetValue != null) && (
+              <div className="flex items-center gap-4 py-3 font-mono text-[11px] uppercase tracking-[0.08em]">
+                {pr && (
+                  <span className="text-faint">
+                    PR <span className="text-ink">{pr.weight} kg × {pr.reps}</span>
+                  </span>
+                )}
+                {topSetValue != null && (
+                  <span className="text-faint">
+                    Top set <span className="text-accent">{topSetValue} kg</span>
+                  </span>
+                )}
+              </div>
             )}
-            {topSetValue != null && (
-              <span className="text-faint">
-                Top set <span className="text-accent">{topSetValue} kg</span>
-              </span>
+            {recent.length > 0 && (
+              <div className="border-t border-hairline-soft py-2.5">
+                <div className="mb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-faint">Recent</div>
+                {recent.map((entry) => (
+                  <div key={entry.date} className="flex items-center justify-between py-1.5">
+                    <span className="font-mono text-[11px] tracking-[0.06em] text-muted">
+                      {formatDateShort(new Date(`${entry.date}T12:00:00`))}
+                    </span>
+                    <span className="font-mono text-[11px] tracking-[0.04em] text-[#C4CCD3]">{entry.summary}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
