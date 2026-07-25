@@ -92,6 +92,13 @@ export const WORKOUTS: Record<string, WorkoutTemplate> = {
     name: 'Leg Day',
     blocks: [
       {
+        name: 'Warm-up',
+        exercises: [
+          { id: 'adductor-machine', name: 'Adductor Machine', sets: 2, reps: '12–15', unit: 'kg', tracked: true, note: 'Light. Controlled squeeze, prep the inner thighs.' },
+          { id: 'abductor-machine', name: 'Abductor Machine', sets: 2, reps: '12–15', unit: 'kg', tracked: true, note: 'Light. Controlled, fire up the glutes/hips.' },
+        ],
+      },
+      {
         name: 'Mobility Prep',
         exercises: [
           { id: 'runners-lunge', name: "Runner's Lunge w/ Rotation",  sets: 2, reps: '5/side', unit: 'check', tracked: false, note: 'Pelvis tucked, glutes on, ribs down. Rotate toward front leg.' },
@@ -101,16 +108,16 @@ export const WORKOUTS: Record<string, WorkoutTemplate> = {
       {
         name: 'Strength',
         exercises: [
-          { id: 'sl-rdl',    name: 'Single-Leg Romanian Deadlift', sets: 3, reps: '6–10/leg', unit: 'kg', tracked: true, note: 'Opposite-hand load, hips square, slow control.' },
-          { id: 'bulgarian', name: 'Bulgarian Split Squat',        sets: 3, reps: '6–10/leg', unit: 'kg', tracked: true, note: 'Slow descent + pause, upright torso, glutes active.' },
-          { id: 'hip-thrust', name: 'Hip Thrust',                  sets: 3, reps: '8–12',     unit: 'kg', tracked: true, note: 'Full lockout, ribs down, pause at top.' },
+          { id: 'squat',     name: 'Squat',                        sets: 4, reps: '≤6',       unit: 'kg', tracked: true, note: 'Heavy, low rep. Full depth, brace hard, controlled descent.' },
+          { id: 'sl-rdl',    name: 'Single-Leg Romanian Deadlift', sets: 3, reps: '6–8/leg',  unit: 'kg', tracked: true, note: 'Opposite-hand load, hips square, slow control.' },
+          { id: 'bulgarian', name: 'Bulgarian Split Squat',        sets: 3, reps: '6–8/leg',  unit: 'kg', tracked: true, note: 'Slow descent + pause, upright torso, glutes active.' },
+          { id: 'hip-thrust', name: 'Hip Thrust',                  sets: 3, reps: '6–8',      unit: 'kg', tracked: true, note: 'Full lockout, ribs down, pause at top.' },
         ],
       },
       {
         name: 'Lower Leg & Stability',
         exercises: [
-          { id: 'tib-raise',    name: 'Tibialis Raises',             sets: 3, reps: '15–20',   unit: 'kg',         tracked: true,  locked: true, note: 'MANDATORY — shin-splint insurance. Bodyweight or light plate; add load as able.' },
-          { id: 'calf-raise',   name: 'Calf Raises (slow eccentric)', sets: 3, reps: '12–15',   unit: 'kg',         tracked: true,  note: '3s lower. Builds lower-leg resilience for running.' },
+          { id: 'calf-raise',   name: 'Calf Raises (slow eccentric)', sets: 3, reps: '8',       unit: 'kg',         tracked: true,  note: '3s lower. Builds lower-leg resilience for running.' },
           { id: 'march-bridge', name: 'Marching Glute Bridge',        sets: 2, reps: '12 total', unit: 'bodyweight', tracked: false, note: 'Keep hips level.' },
         ],
       },
@@ -118,7 +125,6 @@ export const WORKOUTS: Record<string, WorkoutTemplate> = {
         name: 'Abs',
         exercises: [
           { id: 'cable-crunch',     name: 'Cable Crunches',    sets: 3, reps: '12–15', unit: 'kg',         tracked: true },
-          { id: 'seated-leg-raise', name: 'Seated Leg Raises', sets: 3, reps: '15–20', unit: 'bodyweight', tracked: true },
         ],
       },
       {
