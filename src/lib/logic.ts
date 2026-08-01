@@ -1,4 +1,4 @@
-import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, SwapStore, GymOverrides, Zone, StravaActivity } from '../types';
+import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, SwapStore, GymOverrides, Zone, SessionType, StravaActivity } from '../types';
 
 /** Structural subset of PlanConfig.athlete — anything with baselines works. */
 export interface AthleteBaselines {
@@ -219,8 +219,20 @@ export function nextGymDay(today: Date, week: Week): Day | undefined {
   return week.days.find((d) => d.date >= t && d.gym);
 }
 
-export function isHardSession(type: string): boolean {
-  return type === 'LONG' || type === 'WORKOUT' || type === 'RACE';
+/**
+ * Sessions that carry real intensity cost. A competitive 90-minute match is
+ * high-intensity with repeated accelerations and change of direction — it counts,
+ * and the app under-counted load for as long as it did not.
+ */
+const HARD_TYPES = new Set<SessionType>(['LONG', 'WORKOUT', 'RACE', 'GAME']);
+
+export function isHardSession(type: SessionType): boolean {
+  return HARD_TYPES.has(type);
+}
+
+/** Weekly hard-session count. Two is the target; three means something must give. */
+export function hardSessionCount(week: Week): number {
+  return week.days.filter((d) => isHardSession(d.type)).length;
 }
 
 export function formatDateLong(date: Date): string {

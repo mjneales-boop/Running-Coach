@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 interface TagProps {
   children: ReactNode;
-  tone?: 'accent' | 'muted';
+  tone?: 'accent' | 'muted' | 'warn';
   className?: string;
 }
 
@@ -10,7 +10,9 @@ export function Tag({ children, tone = 'muted', className = '' }: TagProps) {
   const styles =
     tone === 'accent'
       ? 'border-[rgba(0,217,255,0.35)] bg-accent-tint text-accent'
-      : 'border-hairline text-muted';
+      : tone === 'warn'
+        ? 'border-[rgba(245,158,11,0.35)] bg-[rgba(245,158,11,0.10)] text-[#F59E0B]'
+        : 'border-hairline text-muted';
 
   return (
     <span

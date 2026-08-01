@@ -16,6 +16,8 @@ export function runDayNote(day: Day): string {
       return 'Easy spin, heart rate low. Cross-training day — legs stay fresh for tomorrow.';
     case 'RACE':
       return "Today's the day. Trust the training, hold the plan, and enjoy every kilometre.";
+    case 'GAME':
+      return 'Treat this as a hard session, because it is. Warm up properly, fuel it like a workout, and get straight into recovery afterwards — tomorrow is a rest day for a reason.';
     default:
       return 'Stick to the plan and listen to how the body responds.';
   }
@@ -28,6 +30,7 @@ export const SESSION_TYPE_LABEL: Record<SessionType, string> = {
   BIKE: 'Bike',
   REST: 'Rest',
   RACE: 'Race day',
+  GAME: 'Match day',
 };
 
 export const ACTION_LABEL: Record<SessionType, string> = {
@@ -37,4 +40,5 @@ export const ACTION_LABEL: Record<SessionType, string> = {
   RACE: 'Mark run done',
   BIKE: 'Mark bike done',
   REST: 'Complete',
+  GAME: 'Mark game done',
 };

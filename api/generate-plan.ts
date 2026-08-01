@@ -34,7 +34,11 @@ interface ProfileRow {
 
 function guideReferenceText(): string {
   const guide = buildSessionGuide({}); // neutral, de-personalized
-  return Object.values(guide)
+  return Object.entries(guide)
+    // 'game' is fixture-driven and hand-authored — the model may not produce it,
+    // so it must not learn a coaching guide for it either.
+    .filter(([key]) => key !== 'game')
+    .map(([, g]) => g)
     .map(
       (g) =>
         `### ${g.label}\nWHAT: ${g.what}\nWHY: ${g.why}\nFEEL: ${g.feel}\nEXECUTE: ${g.execute.join(' | ')}\nMISTAKE: ${g.mistake}`,

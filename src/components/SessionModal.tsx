@@ -76,13 +76,14 @@ export function SessionModal({
   const guides = guideEntriesForDay(day, sessionGuide);
   const zone = zoneForPace(day.pace, zones);
   const duration = estimateDuration(day);
+  const fixture = day.type === 'GAME' ? day.fixture : undefined;
 
   return (
     <Sheet
       onClose={onClose}
       headerLeft={
         <div className="flex items-center gap-3">
-          <Tag tone="accent">{label}</Tag>
+          <Tag tone={day.type === 'GAME' ? 'warn' : 'accent'}>{label}</Tag>
           <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{dateLabel}</span>
         </div>
       }
@@ -105,6 +106,23 @@ export function SessionModal({
               <StatBlock label="Pace" value={day.pace ?? '—'} unit="/km" />
               <StatBlock label="Est." value={duration ?? '—'} unit="h" />
             </div>
+          )}
+
+          {fixture && (
+            <>
+              <div className="mb-6 grid grid-cols-3 gap-0.5 border-t border-hairline">
+                <StatBlock label="Kick-off" value={fixture.kickoff} unit="" isFirst />
+                <StatBlock label="Side" value={fixture.homeAway === 'home' ? 'Home' : 'Away'} unit="" />
+                <StatBlock label="Duration" value={duration ?? '1:30'} unit="h" />
+              </div>
+              <div className="mb-6 flex flex-wrap items-center gap-2">
+                <Tag tone="warn">vs {fixture.opponent}</Tag>
+                {fixture.venue && (
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">{fixture.venue}</span>
+                )}
+                {fixture.confirmed === false && <Tag tone="warn">Fixture TBC</Tag>}
+              </div>
+            </>
           )}
 
           {zone && (

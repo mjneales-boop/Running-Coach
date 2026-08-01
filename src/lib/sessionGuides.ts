@@ -277,6 +277,39 @@ export function buildSessionGuide(cfg: GuideConfig = {}): Record<string, GuideEn
       mistake: 'Creeping up into true threshold pace. If the reps feel genuinely hard, you are going too fast.',
     },
 
+    marathonPace: {
+      key: 'marathonPace',
+      label: 'marathon-pace block',
+      oneLiner: 'A standalone block at goal pace — rehearsing race rhythm on fresh-ish legs.',
+      what: `A continuous block at marathon pace ${goalPaceAt} sandwiched between easy running.`.replace('  ', ' '),
+      why: 'Locks in goal-pace rhythm and teaches you what it should feel like when you are not already deep into a long run. Lower cost than threshold work, so it slots into weeks where you cannot afford much fatigue.',
+      feel: 'Controlled and rhythmic — comfortably hard but never a struggle. If it feels like a race effort, you are running it too fast.',
+      execute: [
+        goalPace
+          ? `Hit ${goalPace} from the first kilometre of the block — no ramping in.`
+          : 'Hit goal pace from the first kilometre of the block — no ramping in.',
+        'Run the easy portions genuinely easy either side.',
+        `In heat, run MP effort ${mpEffort} rather than forcing the exact pace.`,
+      ],
+      mistake: 'Drifting faster than goal pace because it feels easy. The point is to groove the exact rhythm, not to prove fitness.',
+    },
+
+    game: {
+      key: 'game',
+      label: 'match day',
+      oneLiner: '90 minutes of competitive football — a hard session, whether or not it looks like training.',
+      what: 'A full competitive match: repeated sprints, decelerations and changes of direction over 90 minutes.',
+      why: 'A match is high-intensity, high-impact work. It counts as one of your two weekly hard sessions — it displaces a workout rather than being added on top of one. Counting it honestly is what keeps hard days hard and easy days easy.',
+      feel: 'Near-maximal in bursts, with incomplete recovery between them. Very different stress to a run: the change-of-direction load is what your legs feel the next day.',
+      execute: [
+        'Warm up properly — the first sprint of a match is the highest-risk moment of your week.',
+        'Fuel and hydrate as you would for a workout, not as you would for a kickabout.',
+        'Refuel and get protein in within an hour of full time.',
+        'Protect the following day. The rest day after a match is doing real work.',
+      ],
+      mistake: 'Treating a match as "not training" and stacking a quality session against it. That is how a two-hard-session week quietly becomes three.',
+    },
+
     vo2: {
       key: 'vo2',
       label: 'VO2 / critical velocity',

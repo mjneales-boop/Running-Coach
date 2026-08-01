@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
-    "seed:owner": "NODE_OPTIONS=--experimental-websocket tsx scripts/seed-owner.ts"
+    "seed:owner": "NODE_OPTIONS=--experimental-websocket tsx scripts/seed-owner.ts",
+    "restructure:plan": "NODE_OPTIONS=--experimental-websocket tsx scripts/restructure-plan.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

@@ -67,7 +67,9 @@ export function StravaProvider({ children }: { children: ReactNode }) {
     async (activities: StravaMap) => {
       for (const week of weeks) {
         for (const day of week.days) {
-          if (day.type === 'REST') continue;
+          // GAME days have no run to match. A shakeout jog on a fixture day would
+          // otherwise auto-complete the match with the jog's distance and pace.
+          if (day.type === 'REST' || day.type === 'GAME') continue;
           const activity = activities[day.date];
           if (!activity) continue;
           await setActual(week.id, day.d, {

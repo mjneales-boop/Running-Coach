@@ -12,8 +12,13 @@ export function guideEntriesForDay(day: Day, guide: Record<string, GuideEntry>):
       else entries.push(guide.long);
       break;
     }
-    case 'EASY':
-      entries.push(guide.easy);
+    case 'EASY': {
+      const text = day.title + ' ' + (day.notes ?? '');
+      entries.push(/\brecovery\b|\bshakeout\b/i.test(text) ? guide.recovery : guide.easy);
+      break;
+    }
+    case 'GAME':
+      entries.push(guide.game);
       break;
     case 'BIKE':
       entries.push(guide.bike);
@@ -26,12 +31,18 @@ export function guideEntriesForDay(day: Day, guide: Record<string, GuideEntry>):
       break;
     case 'WORKOUT': {
       const text = day.title + ' ' + (day.notes ?? '');
-      // Sub-T is checked before threshold: "sub-threshold"/"Sub-T" titles also
-      // match the broader threshold patterns ("threshold", \bT\b).
-      if (/steady/i.test(text)) entries.push(guide.steady);
-      else if (/5:10|sub-?t/i.test(text)) entries.push(guide.subThreshold);
-      else if (/4:55|threshold|\bT\b/i.test(text)) entries.push(guide.threshold);
-      else if (/CV|vo2|4:2[5-9]|4:3[0-5]/i.test(text)) entries.push(guide.vo2);
+      // Classify by the session's NAME, never by pace digits. Pace numbers move
+      // whenever the zones are recalibrated (they did — Aug 2026, when sub-T went
+      // 5:00–5:15 → 5:25–5:35 and threshold 4:50–5:00 → 5:10–5:20) and digit-based
+      // matching then silently reassigns guides. Sub-T is tested before threshold
+      // because "sub-threshold" also matches the broader threshold patterns.
+      // The bare-T patterns are deliberately case-SENSITIVE: /\bT\b/i matched any
+      // stray lowercase "t" in the notes.
+      if (/\bsteady\b/i.test(text)) entries.push(guide.steady);
+      else if (/\bsub-?\s?t(hreshold)?\b/i.test(text)) entries.push(guide.subThreshold);
+      else if (/\bthreshold\b/i.test(text) || /@\s*T\b|\bT\s*\(/.test(text)) entries.push(guide.threshold);
+      else if (/\bCV\b|\bvo2\b/i.test(text)) entries.push(guide.vo2);
+      else if (/\bMP\b|marathon pace/i.test(text)) entries.push(guide.marathonPace);
       else entries.push(guide.subThreshold);
       break;
     }

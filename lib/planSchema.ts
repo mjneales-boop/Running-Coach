@@ -20,7 +20,7 @@ export const CANONICAL_ZONES = [
 const daySchema = z.object({
   d: z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
   date: z.string().regex(DATE_RE),
-  type: z.enum(['LONG', 'WORKOUT', 'EASY', 'BIKE', 'REST', 'RACE']),
+  type: z.enum(['LONG', 'WORKOUT', 'EASY', 'BIKE', 'REST', 'RACE', 'GAME']),
   title: z.string().min(1),
   km: z.number().nonnegative().optional(),
   duration: z.number().positive().optional(),
@@ -33,6 +33,15 @@ const daySchema = z.object({
     .object({
       category: z.enum(['intro', 'subThreshold', 'threshold', 'marathonPace']),
       secPerKm: z.number().positive(),
+    })
+    .optional(),
+  fixture: z
+    .object({
+      kickoff: z.string().regex(/^\d{2}:\d{2}$/),
+      opponent: z.string().min(1),
+      venue: z.string().optional(),
+      homeAway: z.enum(['home', 'away']),
+      confirmed: z.boolean().optional(),
     })
     .optional(),
 });
@@ -50,6 +59,9 @@ const weekSchema = z.object({
   race: z.boolean().optional(),
   days: z.array(daySchema).length(7),
 });
+
+/** Week array validator, for hand-authored plans spliced in outside the generator. */
+export const weeksSchema = z.array(weekSchema);
 
 const zoneSchema = z.object({
   name: z.string().min(1),
@@ -92,6 +104,15 @@ export const generatedPlanSchema = z
       ids.add(week.id);
 
       week.days.forEach((day, j) => {
+        // GAME days are fixture-driven — the model cannot know the club schedule,
+        // so it must never invent one. Hand-authored plans bypass this schema.
+        if (day.type === 'GAME') {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['weeks', i, 'days', j, 'type'],
+            message: 'GAME sessions are fixture-driven and must be authored manually',
+          });
+        }
         if (day.date < week.dateStart || day.date > week.dateEnd) {
           ctx.addIssue({
             code: 'custom',

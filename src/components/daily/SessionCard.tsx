@@ -74,11 +74,12 @@ export function SessionCard(props: SessionCardProps) {
   const label = SESSION_TYPE_LABEL[day.type];
   const zone = zoneForPace(day.pace, zones);
   const duration = estimateDuration(day);
+  const fixture = day.type === 'GAME' ? day.fixture : undefined;
 
   return (
     <div className="stride-rise mb-[26px] rounded-[18px] border border-hairline bg-surface p-[22px]">
       <div className="mb-1.5 flex items-center justify-between">
-        <Tag tone="accent">{label}</Tag>
+        <Tag tone={day.type === 'GAME' ? 'warn' : 'accent'}>{label}</Tag>
         <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-faint">{weekMeta}</span>
       </div>
       <div
@@ -87,11 +88,30 @@ export function SessionCard(props: SessionCardProps) {
       >
         {label}
       </div>
-      <div className="my-[18px] grid grid-cols-3 gap-0.5 border-t border-hairline">
-        <StatBlock label="Distance" value={day.km != null ? String(day.km) : '—'} unit="km" isFirst />
-        <StatBlock label="Pace" value={day.pace ?? '—'} unit="/km" />
-        <StatBlock label="Est." value={duration ?? '—'} unit="h" />
-      </div>
+      {fixture ? (
+        // A match has no distance or pace — show the things that actually matter
+        // on the morning of a fixture instead.
+        <div className="my-[18px] grid grid-cols-3 gap-0.5 border-t border-hairline">
+          <StatBlock label="Kick-off" value={fixture.kickoff} unit="" isFirst />
+          <StatBlock label="Side" value={fixture.homeAway === 'home' ? 'Home' : 'Away'} unit="" />
+          <StatBlock label="Duration" value={duration ?? '1:30'} unit="h" />
+        </div>
+      ) : (
+        <div className="my-[18px] grid grid-cols-3 gap-0.5 border-t border-hairline">
+          <StatBlock label="Distance" value={day.km != null ? String(day.km) : '—'} unit="km" isFirst />
+          <StatBlock label="Pace" value={day.pace ?? '—'} unit="/km" />
+          <StatBlock label="Est." value={duration ?? '—'} unit="h" />
+        </div>
+      )}
+      {fixture && (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <Tag tone="warn">vs {fixture.opponent}</Tag>
+          {fixture.venue && (
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">{fixture.venue}</span>
+          )}
+          {fixture.confirmed === false && <Tag tone="warn">Fixture TBC</Tag>}
+        </div>
+      )}
       {zone && (
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">Zone</span>

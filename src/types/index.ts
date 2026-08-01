@@ -1,8 +1,18 @@
-export type SessionType = 'LONG' | 'WORKOUT' | 'EASY' | 'BIKE' | 'REST' | 'RACE';
+export type SessionType = 'LONG' | 'WORKOUT' | 'EASY' | 'BIKE' | 'REST' | 'RACE' | 'GAME';
 export type Phase = 0 | 1 | 2 | 3 | 4;
 export type DayAbbr = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 export type WorkoutPaceCategory = 'intro' | 'subThreshold' | 'threshold' | 'marathonPace';
+
+/** A competitive fixture. GAME days are authored by hand — never generated. */
+export interface Fixture {
+  kickoff: string;                  // 'HH:MM' local
+  opponent: string;
+  venue?: string;
+  homeAway: 'home' | 'away';
+  /** false = assumed from the season pattern; club schedule not yet published. */
+  confirmed?: boolean;
+}
 
 export interface Day {
   d: DayAbbr;
@@ -17,6 +27,7 @@ export interface Day {
   workoutId?: string;
   notes?: string;
   chartPace?: { category: WorkoutPaceCategory; secPerKm: number };
+  fixture?: Fixture;
 }
 
 export interface Week {

@@ -6,6 +6,7 @@ import {
   daysToRace,
   currentPhase,
   weeklyKmDone,
+  hardSessionCount,
   readinessHeadline,
   readinessAdjustment,
   buildProgressStats,
@@ -61,7 +62,15 @@ export interface CoachContext {
   mode: string;
   /** goal pace anchoring the zones (race pace, or a target pace in general mode). */
   goalPace: string;
-  week: { num: string; phase: string; daysOut: number | null; targetKm: number; doneKm: number };
+  week: {
+    num: string;
+    phase: string;
+    daysOut: number | null;
+    targetKm: number;
+    doneKm: number;
+    /** Hard sessions this week (long run, quality workout, race, match). Target is 2; 3 means something must give. */
+    hardSessions: number;
+  };
   readiness: {
     /** false when the athlete hasn't linked Oura / has no readiness data — the coach must NOT cite numbers then. */
     connected: boolean;
@@ -209,6 +218,7 @@ export function buildCoachContext(
       daysOut: isRace ? daysToRace(today, race) : null,
       targetKm: week.targetKm,
       doneKm: weeklyKmDone(week, completion),
+      hardSessions: hardSessionCount(week),
     },
     readiness: {
       connected: hasReadiness,
