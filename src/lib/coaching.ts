@@ -41,8 +41,10 @@ export function guideEntriesForDay(day: Day, guide: Record<string, GuideEntry>):
       if (/\bsteady\b/i.test(text)) entries.push(guide.steady);
       else if (/\bsub-?\s?t(hreshold)?\b/i.test(text)) entries.push(guide.subThreshold);
       else if (/\bthreshold\b/i.test(text) || /@\s*T\b|\bT\s*\(/.test(text)) entries.push(guide.threshold);
-      else if (/\bCV\b|\bvo2\b/i.test(text)) entries.push(guide.vo2);
+      // MP before CV: sessions like "5×1km @ MP + 5×200m @ CV" are MP work with a
+      // short sharpener on the end, not CV sessions. A true CV session names no MP.
       else if (/\bMP\b|marathon pace/i.test(text)) entries.push(guide.marathonPace);
+      else if (/\bCV\b|\bvo2\b/i.test(text)) entries.push(guide.vo2);
       else entries.push(guide.subThreshold);
       break;
     }
