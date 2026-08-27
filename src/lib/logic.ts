@@ -433,7 +433,7 @@ export function buildPaceProgression(
 
   let approximate = false;
 
-  const points = weeks.map((w) => {
+  const allPoints = weeks.map((w) => {
     const inWeek = activities.filter(
       (a) => a.sportType === 'Run' && a.date >= w.dateStart && a.date <= w.dateEnd,
     );
@@ -477,6 +477,13 @@ export function buildPaceProgression(
       band,
     };
   });
+
+  // Trim trailing weeks that haven't happened yet. The zone band is drawn across every
+  // point, so carrying empty future weeks stretched it far past where the lines stop and
+  // made the chart read as broken rather than as a block in progress.
+  let last = -1;
+  for (let i = 0; i < allPoints.length; i += 1) if (allPoints[i].actual != null) last = i;
+  const points = last >= 0 ? allPoints.slice(0, last + 1) : allPoints;
 
   return { points, easyLo, easyHi, approximate, window: win };
 }
