@@ -172,8 +172,8 @@ export function ExerciseCard({
             <div
               className={`mb-2 grid gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-faint ${
                 exercise.unit === 'kg'
-                  ? 'grid-cols-[18px_1.22fr_1fr_44px]'
-                  : 'grid-cols-[18px_minmax(0,1fr)_44px]'
+                  ? 'grid-cols-[18px_minmax(0,1.22fr)_minmax(0,1fr)_auto_44px]'
+                  : 'grid-cols-[18px_minmax(0,1fr)_auto_44px]'
               }`}
             >
               <span>#</span>
@@ -181,6 +181,7 @@ export function ExerciseCard({
               <span className="text-center">
                 {exercise.unit === 'time' ? 'Time' : 'Reps'}
               </span>
+              <span />
               <span />
             </div>
           )}

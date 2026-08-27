@@ -10,7 +10,6 @@ interface StepperProps {
   step: number;
   min?: number;
   max?: number;
-  unit: string;
   /** Dims the value to 38%: a suggestion from last session, not a stored figure. */
   ghost?: boolean;
   /** Committed rows lose their stepper chrome and keep only the number. */
@@ -39,7 +38,6 @@ export function Stepper({
   step,
   min = 0,
   max = 9999,
-  unit,
   ghost = false,
   committed = false,
   disabled = false,
@@ -105,12 +103,13 @@ export function Stepper({
 
   const display = value != null ? format(value) : (placeholder ?? '—');
 
-  // A committed row is a readout, not a control: the chrome goes, the number stays.
+  // A committed row is a readout, not a control: the chrome goes, the number
+  // stays. The unit goes too — the column header above already says WEIGHT and
+  // REPS, and repeating it on every row crowded out the delta chip.
   if (committed) {
     return (
-      <div className="flex min-w-0 items-baseline justify-center gap-1.5">
+      <div className="flex min-w-0 items-baseline justify-center">
         <span className="stride-num font-display text-[17px] font-bold leading-none text-ink">{display}</span>
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-faint">{unit}</span>
       </div>
     );
   }

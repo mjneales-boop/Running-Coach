@@ -166,8 +166,8 @@ export function SetRow({
       <div
         className={`relative grid items-center gap-1.5 ${
           unit === 'kg'
-            ? 'grid-cols-[18px_1.22fr_1fr_44px]'
-            : 'grid-cols-[18px_minmax(0,1fr)_44px]'
+            ? 'grid-cols-[18px_minmax(0,1.22fr)_minmax(0,1fr)_auto_44px]'
+            : 'grid-cols-[18px_minmax(0,1fr)_auto_44px]'
         }`}
       >
         <span
@@ -182,7 +182,6 @@ export function SetRow({
               value={active.weight}
               placeholder={suggestion.weight != null ? String(suggestion.weight) : '—'}
               step={WEIGHT_STEP_KG}
-              unit="KG"
               inputMode="decimal"
               ghost={showingGhost}
               committed={stepperCommitted}
@@ -194,7 +193,6 @@ export function SetRow({
               value={active.reps}
               placeholder={suggestedReps != null ? String(suggestedReps) : '—'}
               step={REPS_STEP}
-              unit="REPS"
               inputMode="numeric"
               ghost={showingGhost}
               committed={stepperCommitted}
@@ -210,7 +208,6 @@ export function SetRow({
             value={active.reps}
             placeholder={suggestedReps != null ? String(suggestedReps) : '—'}
             step={REPS_STEP}
-            unit="REPS"
             inputMode="numeric"
             ghost={showingGhost}
             committed={stepperCommitted}
@@ -225,7 +222,6 @@ export function SetRow({
             value={active.seconds}
             placeholder={suggestion.seconds != null ? String(suggestion.seconds) : '—'}
             step={TIME_STEP_SEC}
-            unit="SEC"
             inputMode="numeric"
             ghost={showingGhost}
             committed={stepperCommitted}
@@ -241,6 +237,17 @@ export function SetRow({
           </span>
         )}
 
+        {/* A real grid column, not an overlay. Empty it collapses to nothing and
+            the row matches the header exactly; occupied it takes the width it
+            needs from the value columns, which are far wider than a readout
+            requires. Absolute positioning put this on top of the reps value. */}
+        <span className="flex items-center justify-end whitespace-nowrap">
+          {/* One or the other, never both: a PR is an increase by definition, so
+              "PR" beside "+2.5 KG" says the same thing twice and costs the value
+              columns twice the width. */}
+          {isPRSet ? <PRTag /> : chip ? <DeltaChip delta={chip} /> : null}
+        </span>
+
         <CommitButton
           committed={showAsCommitted}
           disabled={readOnly || (!showAsCommitted && !canCommit)}
@@ -248,16 +255,6 @@ export function SetRow({
           label={showAsCommitted ? `Edit set ${index + 1}` : `Log set ${index + 1}`}
           onClick={() => (showAsCommitted ? beginEdit() : commit())}
         />
-
-        {/* Feedback floats at the row's right edge, over the space a committed
-            row frees up when its stepper chrome retires. It never takes grid
-            width, so nothing reflows when the chip retires four seconds later. */}
-        {(isPRSet || chip) && (
-          <span className="pointer-events-none absolute inset-y-0 right-[46px] flex items-center gap-1.5">
-            {isPRSet && <PRTag />}
-            {chip && <DeltaChip delta={chip} />}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -272,7 +269,7 @@ export function SetRow({
 function DeltaChip({ delta }: { delta: SetDelta }) {
   const tone = delta.kind === 'up' ? 'text-accent' : 'text-muted';
   return (
-    <span className={`stride-num font-mono text-[10px] uppercase tracking-[0.1em] ${tone}`}>
+    <span className={`stride-num font-mono text-[11px] font-semibold uppercase tracking-[0.08em] ${tone}`}>
       {delta.label}
     </span>
   );
@@ -281,7 +278,7 @@ function DeltaChip({ delta }: { delta: SetDelta }) {
 /** Understated by design: a tag, not a trophy. */
 function PRTag() {
   return (
-    <span className="rounded border border-[rgba(0,217,255,0.4)] bg-accent-tint px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-accent">
+    <span className="rounded border border-[rgba(0,217,255,0.4)] bg-accent-tint px-1.5 py-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
       PR
     </span>
   );
