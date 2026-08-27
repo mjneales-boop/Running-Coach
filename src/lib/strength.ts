@@ -832,3 +832,60 @@ export function prFromIndex(
 ): { set: SetLog; date: string } | undefined {
   return index.prByExercise.get(exerciseId);
 }
+
+// ---------------------------------------------------------------------------
+// Session navigation
+// ---------------------------------------------------------------------------
+
+/** The minimum an exercise needs to expose for completion and advance decisions. */
+export interface SessionExercise {
+  id: string;
+  sets: number;
+}
+
+/** Committed sets of `exerciseId` within one log. */
+export function committedSetCount(log: WorkoutLog | undefined, exerciseId: string): number {
+  return (log?.exercises[exerciseId] ?? []).filter(isCommitted).length;
+}
+
+/** An exercise is done once every planned set is committed. Extra sets are fine. */
+export function isExerciseComplete(log: WorkoutLog | undefined, exercise: SessionExercise): boolean {
+  return exercise.sets > 0 && committedSetCount(log, exercise.id) >= exercise.sets;
+}
+
+/**
+ * Which exercise the session should open next.
+ *
+ * With `afterId`, looks only *forward* from that exercise — this is the
+ * auto-advance after a final set lands, and it must not bounce back up to
+ * something skipped earlier. Without it, returns the first incomplete exercise,
+ * which is how a partially-logged session resumes on open.
+ *
+ * Returns null when everything ahead is complete, which the caller renders as
+ * "no card open" rather than re-opening a finished one.
+ */
+export function nextExerciseId(
+  exercises: SessionExercise[],
+  log: WorkoutLog | undefined,
+  afterId?: string,
+): string | null {
+  const start = afterId ? exercises.findIndex((ex) => ex.id === afterId) + 1 : 0;
+  if (afterId && start === 0) return null; // afterId not in this session
+  const next = exercises.slice(start).find((ex) => !isExerciseComplete(log, ex));
+  return next?.id ?? null;
+}
+
+/**
+ * The rep count to suggest when an exercise has no history to ghost from.
+ *
+ * Takes the low end of the prescription, which is where a set is meant to start:
+ * "8–12" → 8, "≤6" → 6, "6–8/leg" → 6, "12 total" → 12. Returns undefined for a
+ * prescription with no number in it at all ("5–10 min" gives 5, which is
+ * meaningless for reps, so `time` and `check` units must not call this).
+ */
+export function prescribedReps(reps: string): number | undefined {
+  const match = reps.match(/\d+/);
+  if (!match) return undefined;
+  const n = Number(match[0]);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}

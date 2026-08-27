@@ -7,10 +7,13 @@ import {
   currentStreak,
   durabilitySummary,
   isCommitted,
+  isExerciseComplete,
   isPR,
   lastSessionSets,
   lowerLegInsurance,
   musclesFor,
+  nextExerciseId,
+  prescribedReps,
   primaryMuscle,
   sessionDurationMin,
   sessionSetCount,
@@ -624,5 +627,83 @@ describe('legacy logs', () => {
   it('treats them as committed at the log date for adherence', () => {
     const adherence = weeklyGymAdherence([week('1', '2026-07-06', ['mon'])], legacy, '2026-08-26');
     expect(adherence[0].status).toBe('complete');
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+
+describe('session navigation', () => {
+  const exercises = [
+    { id: 'db-bench', sets: 4 },
+    { id: 'lat-pulldown', sets: 4 },
+    { id: 'pec-deck', sets: 3 },
+  ];
+  const four = [set(30, 10, T0), set(30, 10, T0), set(30, 9, T0), set(30, 8, T0)];
+
+  it('treats an exercise as complete once every planned set is committed', () => {
+    const done = log('2026-08-24', 'chestback', { 'db-bench': four });
+    expect(isExerciseComplete(done, exercises[0])).toBe(true);
+  });
+
+  it('does not treat a partially logged exercise as complete', () => {
+    const partial = log('2026-08-24', 'chestback', { 'db-bench': four.slice(0, 3) });
+    expect(isExerciseComplete(partial, exercises[0])).toBe(false);
+  });
+
+  it('counts extra sets beyond the plan as still complete', () => {
+    const extra = log('2026-08-24', 'chestback', { 'db-bench': [...four, set(30, 6, T0)] });
+    expect(isExerciseComplete(extra, exercises[0])).toBe(true);
+  });
+
+  it('resumes at the first incomplete exercise', () => {
+    const partial = log('2026-08-24', 'chestback', { 'db-bench': four });
+    expect(nextExerciseId(exercises, partial)).toBe('lat-pulldown');
+  });
+
+  it('opens the first exercise when nothing is logged', () => {
+    expect(nextExerciseId(exercises, undefined)).toBe('db-bench');
+  });
+
+  it('advances forward only, never back to a skipped exercise', () => {
+    // db-bench was skipped entirely; finishing lat-pulldown must go to pec-deck.
+    const partial = log('2026-08-24', 'chestback', { 'lat-pulldown': four });
+    expect(nextExerciseId(exercises, partial, 'lat-pulldown')).toBe('pec-deck');
+  });
+
+  it('returns null when everything ahead is finished', () => {
+    const allDone = log('2026-08-24', 'chestback', {
+      'db-bench': four,
+      'lat-pulldown': four,
+      'pec-deck': four,
+    });
+    expect(nextExerciseId(exercises, allDone, 'db-bench')).toBeNull();
+    expect(nextExerciseId(exercises, allDone)).toBeNull();
+  });
+
+  it('returns null for an exercise that is not in this session', () => {
+    expect(nextExerciseId(exercises, undefined, 'not-here')).toBeNull();
+  });
+});
+
+
+describe('prescribedReps', () => {
+  it('takes the low end of a range', () => {
+    expect(prescribedReps('8–12')).toBe(8);
+    expect(prescribedReps('12–15')).toBe(12);
+    expect(prescribedReps('6–8/leg')).toBe(6);
+  });
+
+  it('handles the ceiling and per-side forms used in the leg template', () => {
+    expect(prescribedReps('≤6')).toBe(6);
+    expect(prescribedReps('5/side')).toBe(5);
+    expect(prescribedReps('12 total')).toBe(12);
+    expect(prescribedReps('8 each')).toBe(8);
+    expect(prescribedReps('15')).toBe(15);
+  });
+
+  it('returns undefined when there is no number to take', () => {
+    expect(prescribedReps('AMRAP')).toBeUndefined();
+    expect(prescribedReps('')).toBeUndefined();
   });
 });

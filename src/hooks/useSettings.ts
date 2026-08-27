@@ -7,6 +7,8 @@ export interface StrideSettings {
   units: 'km' | 'mi';
   notifDaily: boolean;
   notifCoach: boolean;
+  /** Buzz when the rest timer expires. No sound, ever. */
+  hapticRest: boolean;
 }
 
 const DEFAULT_SETTINGS: StrideSettings = {
@@ -16,6 +18,7 @@ const DEFAULT_SETTINGS: StrideSettings = {
   units: 'km',
   notifDaily: true,
   notifCoach: true,
+  hapticRest: true,
 };
 
 export function useSettings() {

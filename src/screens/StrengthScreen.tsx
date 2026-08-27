@@ -1,22 +1,46 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
-import { ExerciseAccordion } from '../components/strength/ExerciseAccordion';
+import { ExerciseCard } from '../components/strength/ExerciseCard';
+import { RestTimer } from '../components/strength/RestTimer';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan } from '../hooks/usePlan';
 import { useSwaps } from '../hooks/useSwaps';
 import { useGymSchedule } from '../hooks/useGymSchedule';
 import { useExerciseOverrides } from '../hooks/useExerciseOverrides';
 import { useStrength } from '../hooks/useStrength';
-import { WORKOUTS } from '../constants/workouts';
+import { useSettings } from '../hooks/useSettings';
+import { WORKOUTS, restDefaultFor } from '../constants/workouts';
+import type { Exercise } from '../constants/workouts';
 import { getSessionExercises, getDefaultExercises } from '../lib/exercises';
-import { allTimePR, recentLogsSummary } from '../lib/strength';
+import { buildStrengthIndex, isCommitted, lastSessionSets, nextExerciseId } from '../lib/strength';
 import { applySwapsToWeek, applyGymOverrides, nextGymDay } from '../lib/logic';
 import type { Day, DayAbbr, SetLog } from '../types';
 
+/** Beat between the last set landing and the next exercise opening, so the commit is seen. */
+const AUTO_ADVANCE_MS = 400;
+
 function localDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** `NEXT · WED 27 AUG` */
+function dayStamp(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d
+    .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+    .replace(',', '')
+    .toUpperCase();
+}
+
+/**
+ * Untracked mobility and cooldown work still belongs in the session — it just
+ * has nothing to measure. Rendering it as a tick means the prep actually gets
+ * done instead of being filtered out of existence.
+ */
+function effectiveUnit(exercise: Exercise) {
+  return exercise.tracked ? exercise.unit : 'check';
 }
 
 interface StrengthScreenProps {
@@ -32,7 +56,8 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
   const { swaps } = useSwaps();
   const { gymOverrides, moveGym } = useGymSchedule();
   const { exerciseOverrides, setSessionExercises } = useExerciseOverrides();
-  const { strength, logSet, markExerciseDone } = useStrength();
+  const { strength, commitSet, addSet } = useStrength();
+  const { settings } = useSettings();
   const [showDayPicker, setShowDayPicker] = useState(false);
 
   const currentWeek = useMemo(
@@ -45,38 +70,94 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
     if (!raw) return null;
     return applyGymOverrides(applySwapsToWeek(raw, swaps[focusDay.weekId] ?? {}), gymOverrides);
   }, [focusDay, swaps, gymOverrides, weeks]);
+
   const todayStr = localDateKey(today);
   const gymDay = focusDay
     ? focusWeek?.days.find((d) => d.d === focusDay.dayAbbr)
     : nextGymDay(today, currentWeek);
   const isToday = gymDay?.date === todayStr;
+  const isPast = !!gymDay && gymDay.date < todayStr;
   const date = gymDay?.date ?? todayStr;
   const workoutId = gymDay?.workoutId;
   const workout = workoutId ? WORKOUTS[workoutId] : undefined;
 
-  // Plain computation — the React compiler memoizes; a manual useMemo can't be
-  // preserved now that `date` derives from context-provided plan weeks.
+  // Every exercise, mobility and cooldown included — no longer filtered to `tracked`.
   const exercises = workoutId
-    ? getSessionExercises(workoutId, exerciseOverrides[date]?.exerciseIds ?? null).filter((ex) => ex.tracked)
+    ? getSessionExercises(workoutId, exerciseOverrides[date]?.exerciseIds ?? null)
     : [];
-
-  const [openId, setOpenId] = useState<string | null>(null);
-  const effectiveOpenId = openId ?? exercises[0]?.id ?? null;
 
   const log = strength[date];
 
-  const handleSetChange = (exerciseId: string, index: number, field: 'weight' | 'reps', raw: string) => {
-    if (!workoutId) return;
-    const current = (log?.exercises[exerciseId] ?? [])[index] ?? {};
-    const num = raw === '' ? undefined : Number(raw);
-    const updated: SetLog = { ...current, [field]: raw === '' || Number.isNaN(num) ? undefined : num };
-    logSet(date, workoutId, exerciseId, index, updated);
+  // One pass over the store feeds every ghost prefill on screen. Previously each
+  // card re-scanned the whole store on every render.
+  const index = useMemo(() => buildStrengthIndex(strength), [strength]);
+
+  // `null` means "no explicit choice" and falls through to the first unfinished
+  // exercise; `''` means the athlete deliberately collapsed everything. Deriving
+  // this rather than driving it from an effect keeps a partially-logged session
+  // open at the right card without a render cascade.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrolledFor = useRef<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Auto-advance fires 400ms after a commit, by which point `log` from this
+  // render is stale. The ref hands the timer the current session instead.
+  const logRef = useRef(log);
+  useEffect(() => { logRef.current = log; });
+
+  const effectiveOpenId = openId ?? nextExerciseId(exercises, log) ?? exercises[0]?.id ?? null;
+  const firstExerciseId = exercises[0]?.id;
+
+  // Scroll a resumed session into view once per date. Skipped when the open card
+  // is already the first one, which needs no scrolling.
+  useEffect(() => {
+    if (scrolledFor.current === date) return;
+    scrolledFor.current = date;
+    if (!effectiveOpenId || effectiveOpenId === firstExerciseId) return;
+    const target = effectiveOpenId;
+    requestAnimationFrame(() => {
+      cardRefs.current[target]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [date, effectiveOpenId, firstExerciseId]);
+
+  useEffect(() => () => { if (advanceTimer.current) clearTimeout(advanceTimer.current); }, []);
+
+  // --- rest timer -----------------------------------------------------------
+
+  const [rest, setRest] = useState<{ startedAt: number; durationSec: number } | null>(null);
+
+  // The clock is read inside the updater, which runs outside render — reading it
+  // in the component body would be an impure call the compiler rightly rejects.
+  const startRest = () => {
+    setRest(() => ({ startedAt: Date.now(), durationSec: restDefaultFor(workoutId) }));
   };
 
-  const handleAddSet = (exerciseId: string) => {
+  // --- commit ---------------------------------------------------------------
+
+  const handleCommitSet = (exercise: Exercise, setIndex: number, set: SetLog) => {
     if (!workoutId) return;
-    const count = (log?.exercises[exerciseId] ?? []).length;
-    logSet(date, workoutId, exerciseId, count, {});
+    commitSet(date, workoutId, exercise.id, setIndex, set);
+
+    // Mobility ticks are not sets — a 90-second timer over a hip stretch is noise.
+    if (effectiveUnit(exercise) !== 'check') startRest();
+
+    // Was that the last planned set? Count the others so this decision does not
+    // wait on the state update the commit just triggered.
+    const others = (log?.exercises[exercise.id] ?? []).filter((s, i) => i !== setIndex && isCommitted(s)).length;
+    if (exercise.sets > 0 && others + 1 >= exercise.sets) {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      advanceTimer.current = setTimeout(() => {
+        // Forward-only: never bounce back to an exercise deliberately skipped.
+        const next = nextExerciseId(exercises, logRef.current, exercise.id);
+        setOpenId(next ?? '');
+        if (next) {
+          requestAnimationFrame(() => {
+            cardRefs.current[next]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          });
+        }
+      }, AUTO_ADVANCE_MS);
+    }
   };
 
   const handleSwapExercise = (oldId: string, newId: string) => {
@@ -113,32 +194,32 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
     );
   }
 
+  const eyebrow = isToday
+    ? 'Today · gym'
+    : isPast
+      ? `${dayStamp(date)} · logged`
+      : `Next · ${dayStamp(date)}`;
+
   return (
     <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">
       <ScreenHeader onAvatarClick={onOpenSettings} />
 
       <div className="stride-rise mb-[22px] border-b border-hairline pb-[22px]">
-        <Eyebrow>{isToday ? 'Today · gym' : 'Next · gym'}</Eyebrow>
+        <Eyebrow>{eyebrow}</Eyebrow>
+        {/* The tab bar already says Strength — the title's job is to name the session. */}
         <h1
           className="mt-3.5 font-display text-[40px] font-extrabold uppercase leading-[0.94] tracking-[-0.01em]"
           style={{ fontVariationSettings: "'wdth' 118" }}
         >
-          Strength
+          {workout.name}
         </h1>
-      </div>
-
-      <div className="stride-rise mb-4 flex items-baseline justify-between">
-        <Eyebrow>{workout.name}</Eyebrow>
-        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">
-          {exercises.length} lifts · ~{Math.round(exercises.length * 8)} min
-        </span>
       </div>
 
       {otherDays.length > 0 && (
         <div className="stride-rise mb-5">
           <button
             onClick={() => setShowDayPicker((v) => !v)}
-            className="rounded-lg border border-dashed border-hairline-strong px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.05em] text-muted"
+            className="min-h-[44px] rounded-lg border border-dashed border-hairline-strong px-2.5 font-mono text-[10.5px] uppercase tracking-[0.05em] text-muted"
           >
             Move to another day
           </button>
@@ -148,7 +229,7 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
                 <button
                   key={d.d}
                   onClick={() => handleMoveDay(d)}
-                  className="rounded-lg border border-hairline px-3 py-1.5 font-mono text-[11.5px] uppercase tracking-[0.05em] text-muted"
+                  className="min-h-[44px] rounded-lg border border-hairline px-3 font-mono text-[11.5px] uppercase tracking-[0.05em] text-muted"
                 >
                   {d.d}{d.gym ? ` · ${d.gym}` : ''}
                 </button>
@@ -160,30 +241,34 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
 
       <div className="stride-rise">
         {exercises.map((exercise) => {
-          const sets = log?.exercises[exercise.id] ?? [];
-          const pr = allTimePR(strength, exercise.id);
-          const recent = recentLogsSummary(strength, exercise.id, todayStr).slice(0, 3);
-          const done = log?.exerciseDone?.[exercise.id] ?? false;
           const alternatives = workout.alternatives.filter((alt) => !exercises.some((ex) => ex.id === alt.id));
           return (
-            <ExerciseAccordion
-              key={exercise.id}
-              exercise={exercise}
-              sets={sets}
-              pr={pr}
-              recent={recent}
-              done={done}
-              open={effectiveOpenId === exercise.id}
-              onToggleOpen={() => setOpenId(effectiveOpenId === exercise.id ? '' : exercise.id)}
-              onSetChange={(i, field, val) => handleSetChange(exercise.id, i, field, val)}
-              onAddSet={() => handleAddSet(exercise.id)}
-              onToggleDone={() => markExerciseDone(date, workoutId, exercise.id, !done)}
-              alternatives={alternatives}
-              onSwap={(newId) => handleSwapExercise(exercise.id, newId)}
-            />
+            <div key={exercise.id} ref={(el) => { cardRefs.current[exercise.id] = el; }}>
+              <ExerciseCard
+                exercise={{ ...exercise, unit: effectiveUnit(exercise) }}
+                sets={log?.exercises[exercise.id] ?? []}
+                lastSets={lastSessionSets(index, exercise.id, date)}
+                open={effectiveOpenId === exercise.id}
+                onToggleOpen={() => setOpenId(effectiveOpenId === exercise.id ? '' : exercise.id)}
+                onCommitSet={(i, set) => handleCommitSet(exercise, i, set)}
+                onAddSet={() => addSet(date, workoutId, exercise.id)}
+                alternatives={alternatives}
+                onSwap={(newId) => handleSwapExercise(exercise.id, newId)}
+              />
+            </div>
           );
         })}
       </div>
+
+      {rest && (
+        <RestTimer
+          startedAt={rest.startedAt}
+          durationSec={rest.durationSec}
+          haptics={settings.hapticRest}
+          onExtend={(sec) => setRest((r) => (r ? { ...r, durationSec: r.durationSec + sec } : r))}
+          onDismiss={() => setRest(null)}
+        />
+      )}
 
       <TabBar active={activeTab} onChange={onTabChange} />
     </div>
