@@ -10,6 +10,7 @@ import { useSettings } from '../hooks/useSettings';
 import { usePlanConfig } from '../hooks/usePlanConfig';
 import { useAuth } from '../hooks/useAuth';
 import { AdminAllowlist } from '../components/settings/AdminAllowlist';
+import { parseEasyRange } from '../lib/logic';
 
 function raceShortName(name: string) {
   return name.replace(/^EDP\s+/i, '').replace(/\s+\d{4}$/, '');
@@ -135,10 +136,12 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const oura = useOura();
   const strava = useStrava();
   const { settings, update } = useSettings();
-  const { weeks, race, athlete, isRace, isAdmin } = usePlanConfig();
+  const { weeks, race, athlete, isRace, isAdmin, zones } = usePlanConfig();
   const { session, signOut } = useAuth();
 
   const planWeeks = weeks.filter((w) => w.phase !== 0).length;
+  const easyOverride = parseEasyRange(settings.easyPaceFast, settings.easyPaceSlow);
+  const zoneEasy = zones.find((z) => z.name === 'Easy')?.pace;
   const initials = (athlete.name || session?.user.email || '?')
     .split(/\s+/)
     .map((p) => p[0])
@@ -223,6 +226,45 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           <SettingsRow label="Plan length" value={<span className="font-semibold text-muted">{planWeeks} weeks · base → race</span>} />
         </SettingsSection>
       )}
+
+      <SettingsSection title="Easy pace">
+        <div className="py-[14px]">
+          <div className="text-[15.5px] font-semibold">Your easy range</div>
+          <div className="mt-1.5 font-mono text-[10.5px] leading-relaxed tracking-[0.02em] text-muted">
+            {easyOverride
+              ? 'The Easy running chart counts every km you run in this range.'
+              : `Leave blank to use your training zones (${zoneEasy ?? '—'}). Set it if you
+                 run easy at a different pace than the zones assume.`}
+          </div>
+          <div className="mt-3 flex items-center gap-2.5">
+            <div className="w-[112px]">
+              <Input
+                value={settings.easyPaceFast}
+                onChange={(e) => update({ easyPaceFast: e.target.value })}
+                placeholder="6:00"
+                unit="FAST"
+                align="right"
+              />
+            </div>
+            <span className="font-mono text-[13px] text-faint">–</span>
+            <div className="w-[112px]">
+              <Input
+                value={settings.easyPaceSlow}
+                onChange={(e) => update({ easyPaceSlow: e.target.value })}
+                placeholder="6:20"
+                unit="SLOW"
+                align="right"
+              />
+            </div>
+            <span className="font-mono text-[10.5px] text-faint">/km</span>
+          </div>
+          {!easyOverride && (settings.easyPaceFast.trim() || settings.easyPaceSlow.trim()) && (
+            <div className="mt-2.5 font-mono text-[10.5px] tracking-[0.02em] text-warning">
+              Enter both ends as m:ss, fastest first — e.g. 6:00 and 6:20.
+            </div>
+          )}
+        </div>
+      </SettingsSection>
 
       <SettingsSection title="Body">
         <div className="flex items-center justify-between gap-3.5 py-[14px]">

@@ -16,8 +16,9 @@ import { useCompletion } from '../hooks/useCompletion';
 import { useStrength } from '../hooks/useStrength';
 import { useStorage } from '../hooks/useStorage';
 import { useStrava } from '../hooks/useStrava';
+import { useSettings } from '../hooks/useSettings';
 import { useRunSplits } from '../hooks/useRunSplits';
-import { buildProgressStats, buildPaceProgression } from '../lib/logic';
+import { buildProgressStats, buildPaceProgression, parseEasyRange } from '../lib/logic';
 import { buildHrEfficiency } from '../lib/hrEfficiency';
 import { topLifts } from '../lib/strength';
 import type { StravaActivity } from '../types';
@@ -45,6 +46,11 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
   const activityList = useMemo(() => Object.values(stravaActivities), [stravaActivities]);
   const { connected } = useStrava();
   const { splits } = useRunSplits(activityList, connected);
+  const { settings } = useSettings();
+  const easyOverride = useMemo(
+    () => parseEasyRange(settings.easyPaceFast, settings.easyPaceSlow),
+    [settings.easyPaceFast, settings.easyPaceSlow],
+  );
   const [insightsOpen, setInsightsOpen] = useState(false);
 
   const stats = useMemo(
@@ -52,8 +58,8 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
     [weeks, completion, currentWeekIndex, peakKm],
   );
   const pace = useMemo(
-    () => buildPaceProgression(weeks, activityList, zones, splits),
-    [weeks, activityList, zones, splits],
+    () => buildPaceProgression(weeks, activityList, zones, splits, easyOverride),
+    [weeks, activityList, zones, splits, easyOverride],
   );
   const lifts = useMemo(() => topLifts(strength, localDateKey(today)), [strength, today]);
   const hrEfficiency = useMemo(

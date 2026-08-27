@@ -379,6 +379,26 @@ export interface PaceProgression {
 }
 
 /**
+ * Parse a hand-entered easy-pace range ("6:00" / "6:20") into minutes-per-km bounds.
+ *
+ * Returns null unless both ends parse to a sane running pace and the range is the right
+ * way round — a half-typed or nonsensical value must fall back to the zone-derived
+ * window rather than silently emptying the chart.
+ */
+export function parseEasyRange(fast: string, slow: string): { fast: number; slow: number } | null {
+  const one = (raw: string): number | null => {
+    const m = raw.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+    if (!m) return null;
+    const v = Number(m[1]) + Number(m[2]) / 60;
+    return v >= 2 && v <= 15 ? v : null;
+  };
+  const f = one(fast);
+  const s = one(slow);
+  if (f == null || s == null || f >= s) return null;
+  return { fast: f, slow: s };
+}
+
+/**
  * The pace window that counts as an easy kilometre.
  *
  * Not the Easy band verbatim, and not a flat tolerance either — a symmetric ±30s window
@@ -424,11 +444,19 @@ export function buildPaceProgression(
   activities: StravaActivity[],
   zones: Zone[],
   splitsById: Record<string, StravaSplit[] | null> = {},
+  override?: { fast: number; slow: number } | null,
 ): PaceProgression {
   const easyZone = zones.find((z) => z.name === 'Easy')!;
-  const [easyLo, easyHi] = easyZone.pace.split('\u2013').map(parsePaceToMinutes);
+  const [zoneLo, zoneHi] = easyZone.pace.split('\u2013').map(parsePaceToMinutes);
+
+  // An explicit range is taken literally — it *is* both the target band and the counting
+  // window, with no widening. The zone-derived path can safely widen to the neighbouring
+  // zone midpoints because those neighbours bound it; a hand-entered range has no such
+  // guard rails, and grace on the fast side could reach marathon pace.
+  const win = override ?? easyKmWindow(zones);
+  const easyLo = override ? override.fast : zoneLo;
+  const easyHi = override ? override.slow : zoneHi;
   const band: [number, number] = [easyLo, easyHi];
-  const win = easyKmWindow(zones);
   const isEasyPace = (p: number) => p >= win.fast && p <= win.slow;
 
   let approximate = false;
