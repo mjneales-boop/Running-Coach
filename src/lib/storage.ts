@@ -100,6 +100,7 @@ const blobAlias: Record<string, string> = {
   'stride-settings': 'settings',
   'stride-coach-messages': 'coach-messages',
   'marathon-strava-lastrun': 'strava-lastrun',
+  'marathon-strava-splits': 'strava-splits',
   'marathon-settings': 'app-settings',
 };
 

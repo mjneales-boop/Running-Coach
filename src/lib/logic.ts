@@ -1,4 +1,4 @@
-import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, SwapStore, GymOverrides, Zone, SessionType, StravaActivity } from '../types';
+import type { Week, Day, PhaseInfo, CompletionEntry, ReadinessEntry, ReadinessTier, WeekContentMap, SwapStore, GymOverrides, Zone, SessionType, StravaActivity, StravaSplit } from '../types';
 
 /** Structural subset of PlanConfig.athlete — anything with baselines works. */
 export interface AthleteBaselines {
@@ -356,8 +356,12 @@ function parsePaceToMinutes(pace: string): number {
 export interface PacePoint {
   weekId: string;
   label: string;
-  /** Distance-weighted average pace of the week's aerobic runs. Undefined if none. */
+  /** Distance-weighted pace across the week's easy kilometres. Undefined if none. */
   actual?: number;
+  /** Distance-weighted average HR over those same kilometres. Undefined if unrecorded. */
+  hr?: number;
+  /** How many kilometres of easy running the week's numbers rest on. */
+  easyKm: number;
   /** The Easy zone as [fast bound, slow bound] — the band `actual` should sit inside. */
   band: [number, number];
 }
@@ -368,55 +372,111 @@ export interface PaceProgression {
   easyLo: number;
   /** Slow end of the Easy zone. */
   easyHi: number;
+  /** True when at least one week fell back to whole-run averages (splits still syncing). */
+  approximate: boolean;
+  /** The pace window a kilometre must fall in to count. Wider than the band itself. */
+  window: { fast: number; slow: number };
 }
 
 /**
- * Weekly aerobic pace against the Easy zone.
+ * The pace window that counts as an easy kilometre.
  *
- * The target here is a flat band, not a ramp toward marathon pace. Easy running
- * stays easy for the whole block — it develops the aerobic base, and running it
- * at MP is how athletes get hurt. A previous version drew a straight line from
- * the Easy midpoint down to MP over the plan's length, which implied your easy
- * runs should finish the block *at* race pace. They shouldn't.
+ * Not the Easy band verbatim, and not a flat tolerance either — a symmetric ±30s window
+ * around a 6:10–6:40 band reaches 5:40, which is marathon pace, so the MP finish of a
+ * long run would be admitted as easy running. Instead each edge extends halfway to the
+ * neighbouring zone, so every kilometre lands in whichever zone it is genuinely nearest
+ * and the boundaries can never cross into Steady or Recovery territory.
+ */
+export function easyKmWindow(zones: Zone[]): { fast: number; slow: number } {
+  const easy = zones.find((z) => z.name === 'Easy')!;
+  const [lo, hi] = easy.pace.split('\u2013').map(parsePaceToMinutes);
+
+  // Every other zone's pace bounds, as plain numbers on the same min/km scale.
+  const others = zones
+    .filter((z) => z.name !== 'Easy')
+    .flatMap((z) => z.pace.split('\u2013').map(parsePaceToMinutes))
+    .filter((n) => Number.isFinite(n));
+
+  const fasterEdge = Math.max(...others.filter((n) => n < lo), -Infinity);
+  const slowerEdge = Math.min(...others.filter((n) => n > hi), Infinity);
+
+  return {
+    fast: Number.isFinite(fasterEdge) ? (fasterEdge + lo) / 2 : lo - 0.25,
+    slow: Number.isFinite(slowerEdge) ? (hi + slowerEdge) / 2 : hi + 0.25,
+  };
+}
+
+/**
+ * Weekly easy pace and the heart rate that bought it.
  *
- * `actual` is distance-weighted (total time / total distance), so a 25 km long
- * run counts for more than a 5 km shakeout, and it only counts runs that were
- * plausibly meant to be aerobic — nothing quicker than the fast end of Steady
- * (that's a workout) and nothing slower than the fast end of Recovery (that's a
- * recovery jog). Both used to land in the average and swung it week to week on
- * session mix rather than fitness.
+ * Measured per kilometre, not per run. A long run is mostly easy running with a harder
+ * finish, and an interval session is a hard middle wrapped in easy warmup and cooldown —
+ * judging either by its whole-run average throws away the easy kilometres in both. So we
+ * take every split whose pace lands in the easy range, wherever it happened, and weight
+ * by distance.
+ *
+ * Runs whose splits haven't been backfilled yet fall back to their whole-run average
+ * (counted only if that average is itself easy), so the chart is useful immediately and
+ * sharpens as `useRunSplits` fills in. `approximate` reports when that fallback was used.
  */
 export function buildPaceProgression(
   weeks: Week[],
   activities: StravaActivity[],
   zones: Zone[],
+  splitsById: Record<string, StravaSplit[] | null> = {},
 ): PaceProgression {
   const easyZone = zones.find((z) => z.name === 'Easy')!;
   const [easyLo, easyHi] = easyZone.pace.split('\u2013').map(parsePaceToMinutes);
-  const steadyZone = zones.find((z) => z.name === 'Steady')!;
-  const recoveryZone = zones.find((z) => z.name === 'Recovery')!;
-  // Fast bound: anything quicker than this was a workout, not an easy run.
-  const fastBound = parsePaceToMinutes(steadyZone.pace.split('\u2013')[0]);
-  // Slow bound: anything slower than this was a recovery jog.
-  const slowBound = parsePaceToMinutes(recoveryZone.pace.split('\u2013')[0]);
-
   const band: [number, number] = [easyLo, easyHi];
+  const win = easyKmWindow(zones);
+  const isEasyPace = (p: number) => p >= win.fast && p <= win.slow;
+
+  let approximate = false;
 
   const points = weeks.map((w) => {
     const inWeek = activities.filter(
-      (a) =>
-        a.sportType === 'Run' &&
-        a.date >= w.dateStart &&
-        a.date <= w.dateEnd &&
-        a.distanceKm > 0 &&
-        a.avgPaceMinKm >= fastBound &&
-        a.avgPaceMinKm <= slowBound,
+      (a) => a.sportType === 'Run' && a.date >= w.dateStart && a.date <= w.dateEnd,
     );
-    const km = inWeek.reduce((s, a) => s + a.distanceKm, 0);
-    const min = inWeek.reduce((s, a) => s + a.movingTimeSec / 60, 0);
-    const actual = km > 0 ? Math.round((min / km) * 100) / 100 : undefined;
-    return { weekId: w.id, label: w.num, actual, band };
+
+    let km = 0;        // easy distance
+    let minutes = 0;   // time over that distance
+    let hrKm = 0;      // distance that also carried a HR reading
+    let hrSum = 0;     // HR weighted by that distance
+
+    for (const a of inWeek) {
+      const splits = splitsById[a.id];
+
+      if (splits && splits.length) {
+        for (const sp of splits) {
+          if (!isEasyPace(sp.avgPaceMinKm)) continue;
+          const d = sp.distanceM / 1000;
+          if (d <= 0) continue;
+          km += d;
+          minutes += sp.avgPaceMinKm * d;
+          if (sp.avgHR != null) { hrKm += d; hrSum += sp.avgHR * d; }
+        }
+        continue;
+      }
+
+      // No splits cached (or Strava has none). Fall back to the whole-run average, but
+      // only when the run reads as easy end to end — otherwise a tempo session's average
+      // would be admitted as if it were an easy run.
+      if (splits === undefined) approximate = true;
+      if (!a.distanceKm || !isEasyPace(a.avgPaceMinKm)) continue;
+      km += a.distanceKm;
+      minutes += (a.movingTimeSec / 60);
+      if (a.avgHR != null) { hrKm += a.distanceKm; hrSum += a.avgHR * a.distanceKm; }
+    }
+
+    return {
+      weekId: w.id,
+      label: w.num,
+      actual: km > 0 ? Math.round((minutes / km) * 100) / 100 : undefined,
+      hr: hrKm > 0 ? Math.round(hrSum / hrKm) : undefined,
+      easyKm: Math.round(km * 10) / 10,
+      band,
+    };
   });
 
-  return { points, easyLo, easyHi };
+  return { points, easyLo, easyHi, approximate, window: win };
 }

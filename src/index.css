@@ -13,6 +13,10 @@
   --color-accent-tint: rgb(0 217 255 / 0.12);
   --color-accent-glow: rgb(0 217 255 / 0.28);
   --color-warning: #E5675C;
+  /* Heart rate. Warm counterpart to the cyan accent so pace and HR stay
+     distinguishable when plotted on the same chart. */
+  --color-hr: #FF8A6B;
+  --color-hr-tint: rgb(255 138 107 / 0.14);
   --color-success: #10B981;
   --color-hairline: rgb(255 255 255 / 0.08);
   --color-hairline-strong: rgb(255 255 255 / 0.14);

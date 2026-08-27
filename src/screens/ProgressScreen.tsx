@@ -15,6 +15,8 @@ import { usePlanConfig } from '../hooks/usePlanConfig';
 import { useCompletion } from '../hooks/useCompletion';
 import { useStrength } from '../hooks/useStrength';
 import { useStorage } from '../hooks/useStorage';
+import { useStrava } from '../hooks/useStrava';
+import { useRunSplits } from '../hooks/useRunSplits';
 import { buildProgressStats, buildPaceProgression } from '../lib/logic';
 import { buildHrEfficiency } from '../lib/hrEfficiency';
 import { topLifts } from '../lib/strength';
@@ -40,6 +42,9 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
   const { completion } = useCompletion();
   const { strength } = useStrength();
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
+  const activityList = useMemo(() => Object.values(stravaActivities), [stravaActivities]);
+  const { connected } = useStrava();
+  const { splits } = useRunSplits(activityList, connected);
   const [insightsOpen, setInsightsOpen] = useState(false);
 
   const stats = useMemo(
@@ -47,13 +52,13 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
     [weeks, completion, currentWeekIndex, peakKm],
   );
   const pace = useMemo(
-    () => buildPaceProgression(weeks, Object.values(stravaActivities), zones),
-    [weeks, stravaActivities, zones],
+    () => buildPaceProgression(weeks, activityList, zones, splits),
+    [weeks, activityList, zones, splits],
   );
   const lifts = useMemo(() => topLifts(strength, localDateKey(today)), [strength, today]);
   const hrEfficiency = useMemo(
-    () => buildHrEfficiency(Object.values(stravaActivities), zones, HR_WINDOW_DAYS, today),
-    [stravaActivities, zones, today],
+    () => buildHrEfficiency(activityList, zones, HR_WINDOW_DAYS, today),
+    [activityList, zones, today],
   );
 
   return (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ComposedChart, Line, ResponsiveContainer, YAxis, Tooltip } from 'recharts';
+import { ComposedChart, Area, ResponsiveContainer, YAxis, Tooltip } from 'recharts';
 import { fmtPaceMin, type ZoneEfficiency } from '../../lib/hrEfficiency';
 
 interface HrEfficiencyChartProps {
@@ -50,7 +50,7 @@ export function HrEfficiencyChart({ zones, windowDays }: HrEfficiencyChartProps)
               onClick={() => setSelected(i)}
               className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] transition-colors ${
                 i === selected
-                  ? 'border-accent bg-accent/10 text-accent'
+                  ? 'border-[color:var(--color-hr)] bg-[color:var(--color-hr-tint)] text-[color:var(--color-hr)]'
                   : 'border-hairline text-muted'
               }`}
             >
@@ -61,14 +61,17 @@ export function HrEfficiencyChart({ zones, windowDays }: HrEfficiencyChartProps)
       )}
 
       <div className="mb-3 flex items-baseline gap-2.5">
-        <span className="font-display text-[32px] font-extrabold leading-none">
+        <span
+          className="font-display text-[30px] font-extrabold leading-none tracking-[-0.01em]"
+          style={{ color: 'var(--color-hr)' }}
+        >
           {active.avgHR}
-          <span className="ml-1 text-[12px] font-medium text-muted">avg bpm</span>
+          <span className="ml-1.5 font-mono text-[11px] font-medium text-faint">avg bpm</span>
         </span>
         {active.hrDelta != null && active.hrDelta !== 0 && (
-          <span className={`font-mono text-[11px] tracking-[0.06em] ${improving ? 'text-accent' : 'text-muted'}`}>
-            {active.hrDelta > 0 ? '+' : ''}
-            {active.hrDelta} bpm
+          <span className={`font-mono text-[11px] tracking-[0.06em] ${improving ? 'text-success' : 'text-muted'}`}>
+            {active.hrDelta > 0 ? '+' : '−'}
+            {Math.abs(active.hrDelta)} bpm
           </span>
         )}
       </div>
@@ -78,8 +81,8 @@ export function HrEfficiencyChart({ zones, windowDays }: HrEfficiencyChartProps)
           <ComposedChart data={active.points} margin={{ top: 12, right: 4, bottom: 4, left: 4 }}>
             <defs>
               <linearGradient id="hrAreaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-accent)" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="var(--color-accent)" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--color-hr)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--color-hr)" stopOpacity={0} />
               </linearGradient>
             </defs>
             {/* Not reversed: HR is plotted as-is, so a falling line reads as improving. */}
@@ -102,13 +105,17 @@ export function HrEfficiencyChart({ zones, windowDays }: HrEfficiencyChartProps)
                 return p?.date ?? '';
               }}
             />
-            <Line
+            <Area
               type="monotone"
               dataKey="hr"
-              stroke="var(--color-accent)"
+              stroke="var(--color-hr)"
               strokeWidth={2.5}
-              dot={{ r: 3, fill: 'var(--color-accent)', strokeWidth: 0 }}
+              fill="url(#hrAreaFill)"
+              dot={{ r: 3, fill: 'var(--color-hr)', strokeWidth: 0 }}
               connectNulls
+              // Same recharts entrance-animation bug as the pace chart: the
+              // stroke-dasharray sweep intermittently never completes.
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
