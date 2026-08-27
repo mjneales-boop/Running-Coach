@@ -962,3 +962,131 @@ export function isSessionComplete(log: WorkoutLog | undefined, exercises: Sessio
 export function isSessionSkipped(log: WorkoutLog | undefined): boolean {
   return !!log?.skippedAt;
 }
+
+// ---------------------------------------------------------------------------
+// Progression & PRs
+// ---------------------------------------------------------------------------
+
+/** Public name lookup — the catalog is private, but callers need display names. */
+export function exerciseDisplayName(exerciseId: string): string {
+  return exerciseName(exerciseId);
+}
+
+export interface LoggedExercise {
+  exerciseId: string;
+  name: string;
+  /** Most recent session this exercise appeared in. */
+  lastDate: string;
+  sessions: number;
+}
+
+/**
+ * Every exercise with history, most recently logged first.
+ *
+ * Replaces the old workout-tab-then-exercise-chip pairing, which made finding a
+ * lift a two-step hunt. What the athlete wants is nearly always what they
+ * lifted last.
+ */
+export function loggedExercises(index: StrengthIndex): LoggedExercise[] {
+  const list: LoggedExercise[] = [];
+  for (const [exerciseId, history] of index.byExercise) {
+    if (history.length === 0) continue;
+    list.push({
+      exerciseId,
+      name: exerciseName(exerciseId),
+      lastDate: history[history.length - 1].date,
+      sessions: history.length,
+    });
+  }
+  return list.sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.name.localeCompare(b.name));
+}
+
+/** Case-insensitive substring match on the display name. */
+export function filterExercises(list: LoggedExercise[], query: string): LoggedExercise[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((e) => e.name.toLowerCase().includes(q));
+}
+
+export interface ExercisePR {
+  exerciseId: string;
+  name: string;
+  weight: number;
+  reps?: number;
+  date: string;
+  /** Whole days the PR has stood as of `asOf`. */
+  standingDays: number;
+}
+
+/**
+ * All-time bests, most recently set first. Understated by design — no trophies,
+ * no ranking against anyone. `standingDays` is the interesting part: a PR that
+ * has stood a long time is information, not a reproach.
+ */
+export function prList(index: StrengthIndex, asOf: string): ExercisePR[] {
+  const asOfMs = new Date(`${asOf}T00:00:00`).getTime();
+  const list: ExercisePR[] = [];
+
+  for (const [exerciseId, pr] of index.prByExercise) {
+    if (pr.set.weight == null) continue; // bodyweight/time bests are not a weight PR
+    list.push({
+      exerciseId,
+      name: exerciseName(exerciseId),
+      weight: pr.set.weight,
+      reps: pr.set.reps,
+      date: pr.date,
+      standingDays: Math.max(0, Math.round((asOfMs - new Date(`${pr.date}T00:00:00`).getTime()) / 86400000)),
+    });
+  }
+
+  return list.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+}
+
+/** "3 weeks", "5 months" — how long a PR has stood, in the coarsest honest unit. */
+export function standingFor(days: number): string {
+  if (days === 0) return 'today';
+  if (days < 7) return days === 1 ? '1 day' : `${days} days`;
+  if (days < 60) {
+    const weeks = Math.round(days / 7);
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`;
+  }
+  const months = Math.round(days / 30);
+  return `${months} ${months === 1 ? 'month' : 'months'}`;
+}
+
+/**
+ * The line beneath the durability chart, derived from what the data actually
+ * says rather than asserted.
+ *
+ * The brief's example copy — "weeks you lifted, you ran more" — is only true
+ * when it is true. Hardcoding it means the app claims a relationship the
+ * numbers directly above it contradict, which is worse than saying nothing.
+ * Nothing here is causal in either direction, and a thin comparison says so.
+ */
+export function durabilityNote(summary: DurabilitySummary): string {
+  const { weeksAssessed, weeksWithFullGym, avgKmWithFullGym, avgKmWithoutFullGym } = summary;
+
+  if (weeksAssessed === 0) {
+    return 'Not enough completed weeks yet to compare mileage against gym work.';
+  }
+  if (weeksWithFullGym === weeksAssessed) {
+    return 'Every week assessed had its full gym work, so there is nothing to compare against — which is the better problem to have.';
+  }
+  if (weeksWithFullGym === 0) {
+    return 'No week yet has had all its scheduled gym work, so there is nothing to compare against.';
+  }
+
+  const thinnest = Math.min(weeksWithFullGym, weeksAssessed - weeksWithFullGym);
+  const caveat =
+    thinnest < 3
+      ? ' One side of that comparison is only a week or two, so read it lightly.'
+      : ' Worth noticing, not proof.';
+
+  if (avgKmWithFullGym > avgKmWithoutFullGym) {
+    return `Strength work protects volume. Weeks you lifted, you ran more.${caveat}`;
+  }
+  if (avgKmWithFullGym === avgKmWithoutFullGym) {
+    return `Mileage looks the same either way so far.${caveat}`;
+  }
+  return `Mileage has not been higher in the weeks you lifted.${caveat}`;
+}

@@ -5,6 +5,7 @@ import {
   compareToLastSession,
   consistencySummary,
   currentStreak,
+  durabilityNote,
   durabilitySummary,
   isCommitted,
   isExerciseComplete,
@@ -12,6 +13,10 @@ import {
   isSessionComplete,
   isSessionSkipped,
   lastSessionSets,
+  loggedExercises,
+  filterExercises,
+  prList,
+  standingFor,
   lowerLegInsurance,
   musclesFor,
   nextExerciseId,
@@ -799,5 +804,134 @@ describe('session completion state', () => {
         log('2026-08-24', 'chestback', {}, { skippedAt: '2026-08-24T09:00:00Z', skipReason: 'recovery' }),
       ),
     ).toBe(true);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+
+describe('loggedExercises', () => {
+  const index = buildStrengthIndex(
+    store(
+      log('2026-08-10', 'chestback', { 'db-bench': [set(30, 10, T0)], 'pec-deck': [set(40, 12, T0)] }),
+      log('2026-08-17', 'chestback', { 'db-bench': [set(32.5, 10, T0)] }),
+      log('2026-08-20', 'legs', { squat: [set(80, 5, T0)] }),
+    ),
+  );
+
+  it('orders by most recently logged', () => {
+    expect(loggedExercises(index).map((e) => e.exerciseId)).toEqual(['squat', 'db-bench', 'pec-deck']);
+  });
+
+  it('reports session counts and display names', () => {
+    const bench = loggedExercises(index).find((e) => e.exerciseId === 'db-bench')!;
+    expect(bench).toMatchObject({ sessions: 2, name: 'DB Bench Press', lastDate: '2026-08-17' });
+  });
+
+  it('omits exercises with no history', () => {
+    expect(loggedExercises(index).some((e) => e.exerciseId === 'lat-pulldown')).toBe(false);
+    expect(loggedExercises(buildStrengthIndex({}))).toEqual([]);
+  });
+
+  it('filters case-insensitively and returns everything for an empty query', () => {
+    const all = loggedExercises(index);
+    expect(filterExercises(all, 'bench').map((e) => e.exerciseId)).toEqual(['db-bench']);
+    expect(filterExercises(all, 'SQUAT').map((e) => e.exerciseId)).toEqual(['squat']);
+    expect(filterExercises(all, '   ')).toHaveLength(all.length);
+    expect(filterExercises(all, 'nothing-matches')).toEqual([]);
+  });
+});
+
+describe('prList', () => {
+  const index = buildStrengthIndex(
+    store(
+      log('2026-06-01', 'chestback', { 'db-bench': [set(30, 10, T0)] }),
+      log('2026-08-17', 'legs', { squat: [set(100, 5, T0)] }),
+      log('2026-08-10', 'chestback', { pullups: [set(undefined, 12, T0)] }), // bodyweight
+    ),
+  );
+
+  const prs = prList(index, '2026-08-24');
+
+  it('lists all-time bests, most recently set first', () => {
+    expect(prs.map((p) => p.exerciseId)).toEqual(['squat', 'db-bench']);
+  });
+
+  it('reports how long each PR has stood', () => {
+    expect(prs.find((p) => p.exerciseId === 'squat')!.standingDays).toBe(7);
+    expect(prs.find((p) => p.exerciseId === 'db-bench')!.standingDays).toBe(84);
+  });
+
+  it('excludes bodyweight bests, which are not a weight PR', () => {
+    expect(prs.some((p) => p.exerciseId === 'pullups')).toBe(false);
+  });
+
+  it('is empty for an empty store', () => {
+    expect(prList(buildStrengthIndex({}), '2026-08-24')).toEqual([]);
+  });
+});
+
+describe('standingFor', () => {
+  it('uses the coarsest honest unit', () => {
+    expect(standingFor(0)).toBe('today');
+    // A PR set yesterday must not claim to have been set today.
+    expect(standingFor(1)).toBe('1 day');
+    expect(standingFor(4)).toBe('4 days');
+    expect(standingFor(7)).toBe('1 week');
+    expect(standingFor(21)).toBe('3 weeks');
+    expect(standingFor(90)).toBe('3 months');
+  });
+});
+
+
+describe('durabilityNote', () => {
+  const base = { weeksAssessed: 10, weeksWithFullGym: 5, avgKmWithFullGym: 58, avgKmWithoutFullGym: 44 };
+
+  it('claims the relationship only when the numbers support it', () => {
+    expect(durabilityNote(base)).toMatch(/you ran more/);
+  });
+
+  it('never claims it when mileage was not higher on lifting weeks', () => {
+    const note = durabilityNote({ ...base, avgKmWithFullGym: 54, avgKmWithoutFullGym: 56 });
+    expect(note).not.toMatch(/you ran more/);
+    expect(note).toMatch(/not been higher/);
+  });
+
+  it('does not claim it when the two are equal', () => {
+    const note = durabilityNote({ ...base, avgKmWithFullGym: 50, avgKmWithoutFullGym: 50 });
+    expect(note).not.toMatch(/you ran more/);
+    expect(note).toMatch(/same either way/);
+  });
+
+  it('warns when one side of the comparison is one or two weeks', () => {
+    expect(durabilityNote({ ...base, weeksAssessed: 11, weeksWithFullGym: 10 })).toMatch(/read it lightly/);
+  });
+
+  it('says there is nothing to compare when every week had full gym work', () => {
+    expect(durabilityNote({ ...base, weeksAssessed: 8, weeksWithFullGym: 8 })).toMatch(/nothing to compare/);
+  });
+
+  it('says there is nothing to compare when no week did', () => {
+    expect(durabilityNote({ ...base, weeksWithFullGym: 0 })).toMatch(/nothing to compare/);
+  });
+
+  it('handles having no assessed weeks at all', () => {
+    expect(
+      durabilityNote({ weeksAssessed: 0, weeksWithFullGym: 0, avgKmWithFullGym: 0, avgKmWithoutFullGym: 0 }),
+    ).toMatch(/Not enough completed weeks/);
+  });
+
+  it('never uses causal language in any branch', () => {
+    const cases = [
+      base,
+      { ...base, avgKmWithFullGym: 40 },
+      { ...base, avgKmWithFullGym: 50, avgKmWithoutFullGym: 50 },
+      { ...base, weeksWithFullGym: 0 },
+      { ...base, weeksAssessed: 8, weeksWithFullGym: 8 },
+      { weeksAssessed: 0, weeksWithFullGym: 0, avgKmWithFullGym: 0, avgKmWithoutFullGym: 0 },
+    ];
+    for (const c of cases) {
+      expect(durabilityNote(c)).not.toMatch(/caused|because of|thanks to|led to|improved your/i);
+    }
   });
 });

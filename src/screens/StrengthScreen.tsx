@@ -7,12 +7,15 @@ import { RestTimer } from '../components/strength/RestTimer';
 import { SessionHeader } from '../components/strength/SessionHeader';
 import { SessionStickyBar } from '../components/strength/SessionStickyBar';
 import { SessionReceipt } from '../components/strength/SessionReceipt';
+import { StatsSegment } from '../components/strength/StatsSegment';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan } from '../hooks/usePlan';
 import { useSwaps } from '../hooks/useSwaps';
 import { useGymSchedule } from '../hooks/useGymSchedule';
 import { useExerciseOverrides } from '../hooks/useExerciseOverrides';
 import { useStrength } from '../hooks/useStrength';
+import { useCompletion } from '../hooks/useCompletion';
 import { useSettings } from '../hooks/useSettings';
 import { WORKOUTS, restDefaultFor } from '../constants/workouts';
 import type { Exercise } from '../constants/workouts';
@@ -41,6 +44,23 @@ const AUTO_ADVANCE_MS = 400;
 
 /** Roughly the session header's height — past this, the sticky bar takes over. */
 const STICKY_AFTER_PX = 150;
+
+type Segment = 'session' | 'stats';
+
+const SEGMENTS = [
+  { value: 'session' as const, label: 'Session' },
+  { value: 'stats' as const, label: 'Stats' },
+];
+
+/**
+ * The athlete's segment choice, remembered for the app session only.
+ *
+ * Module scope rather than component state because switching tabs unmounts this
+ * screen, and a choice that evaporated on every tab switch would not be
+ * remembered in any useful sense. It resets on reload, which is what lets the
+ * date-based default win on a fresh open, as specified.
+ */
+let rememberedSegment: Segment | null = null;
 
 function localDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -78,6 +98,7 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
   const { gymOverrides, moveGym } = useGymSchedule();
   const { exerciseOverrides, setSessionExercises } = useExerciseOverrides();
   const { strength, commitSet, addSet, markComplete, skipSession, unskipSession } = useStrength();
+  const { completion } = useCompletion();
   const { settings } = useSettings();
   const [showDayPicker, setShowDayPicker] = useState(false);
 
@@ -143,6 +164,21 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
     (new Date(`${todayStr}T00:00:00`).getTime() - new Date(`${date}T00:00:00`).getTime()) / 86400000,
   );
   const readOnly = skipped || daysOld > 2;
+
+  // --- segment -------------------------------------------------------------
+
+  // SESSION when there is something to log or something logged today; STATS
+  // otherwise, which is the whole point of STATS — a reason to open the tab
+  // between sessions. A deep link from the Daily screen always means SESSION.
+  const dateDefault: Segment =
+    focusDay || (workoutId && (isToday || setCount.committed > 0)) ? 'session' : 'stats';
+  const [chosenSegment, setChosenSegment] = useState<Segment | null>(() => rememberedSegment);
+  const segment = chosenSegment ?? dateDefault;
+
+  const chooseSegment = (next: Segment) => {
+    rememberedSegment = next;
+    setChosenSegment(next);
+  };
 
   // Scroll a resumed session into view once per date. Skipped when the open card
   // is already the first one, which needs no scrolling.
@@ -228,14 +264,41 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
     setShowDayPicker(false);
   };
 
+  const stats = (
+    <StatsSegment strength={strength} weeks={weeks} completion={completion} todayStr={todayStr} />
+  );
+
+  const segmentControl = (
+    <div className="stride-rise mb-6">
+      <SegmentedControl options={SEGMENTS} value={segment} onChange={chooseSegment} />
+    </div>
+  );
+
+  // Nothing scheduled. Previously a dead end; now the stats surface is still
+  // one tap away, which is where the athlete has a reason to be anyway.
   if (!workout || !workoutId) {
     return (
-      <div className="flex min-h-screen flex-col bg-canvas px-[22px] pb-[132px] pt-1.5">
+      <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">
         <ScreenHeader onAvatarClick={onOpenSettings} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-          <div className="font-display text-2xl font-extrabold uppercase">No gym session</div>
-          <div className="font-mono text-xs uppercase tracking-[0.14em] text-faint">Nothing scheduled this week</div>
+        <div className="stride-rise mb-[22px] border-b border-hairline pb-[22px]">
+          <Eyebrow>No gym scheduled</Eyebrow>
+          <h1
+            className="mt-3.5 font-display text-[40px] font-extrabold uppercase leading-[0.94] tracking-[-0.01em]"
+            style={{ fontVariationSettings: "'wdth' 118" }}
+          >
+            Strength
+          </h1>
         </div>
+        {segmentControl}
+        {segment === 'stats' ? (
+          stats
+        ) : (
+          <div className="stride-rise py-16 text-center">
+            <div className="font-mono text-[12px] uppercase tracking-[0.14em] text-faint">
+              Nothing scheduled this week
+            </div>
+          </div>
+        )}
         <TabBar active={activeTab} onChange={onTabChange} />
       </div>
     );
@@ -263,6 +326,12 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
         />
       </div>
 
+      {segmentControl}
+
+      {segment === 'stats' ? (
+        stats
+      ) : (
+        <>
       <SessionStickyBar
         title={workout.name}
         committed={setCount.committed}
@@ -393,6 +462,8 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
           onExtend={(sec) => setRest((r) => (r ? { ...r, durationSec: r.durationSec + sec } : r))}
           onDismiss={() => setRest(null)}
         />
+      )}
+        </>
       )}
 
       <TabBar active={activeTab} onChange={onTabChange} />
