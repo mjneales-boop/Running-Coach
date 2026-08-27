@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Stepper } from '../ui/Stepper';
 import { Check } from '../ui/Check';
 import { REPS_STEP, TIME_STEP_SEC, WEIGHT_STEP_KG } from '../../constants/workouts';
-import { prescribedReps } from '../../lib/strength';
+import { prescribedReps, setDelta } from '../../lib/strength';
+import type { SetDelta } from '../../lib/strength';
 import type { ExerciseUnit } from '../../constants/workouts';
 import type { SetLog } from '../../types';
 
 /** A dirty row commits itself after this long without a change, so a distracted athlete never loses data. */
 const IDLE_COMMIT_MS = 2500;
+
+/** The delta chip retires after this long. The value it described stays put. */
+const CHIP_VISIBLE_MS = 4000;
 
 interface SetRowProps {
   /** Zero-based; displayed as index + 1. */
@@ -20,6 +24,13 @@ interface SetRowProps {
   /** Shown instead of ghost numbers when the exercise has no history at all. */
   prescription?: string;
   onCommit: (set: SetLog) => void;
+  /** Renders the row as a readout with no controls at all. */
+  readOnly?: boolean;
+  /**
+   * Whether a set would be an all-time best. Asked at commit time, so the PR
+   * sweep fires exactly once, from the commit — never re-derived on a render.
+   */
+  evaluatePR?: (set: SetLog) => boolean;
 }
 
 type Draft = { weight?: number; reps?: number; seconds?: number };
@@ -28,16 +39,28 @@ function draftFrom(set: SetLog | undefined): Draft {
   return { weight: set?.weight, reps: set?.reps, seconds: set?.seconds };
 }
 
-export function SetRow({ index, unit, committed, ghost, prescription, onCommit }: SetRowProps) {
+export function SetRow({
+  index,
+  unit,
+  committed,
+  ghost,
+  prescription,
+  onCommit,
+  readOnly = false,
+  evaluatePR,
+}: SetRowProps) {
   const isCommitted = !!committed;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>({});
   const [dirty, setDirty] = useState(false);
   const [flashKey, setFlashKey] = useState(0);
+  const [sweepKey, setSweepKey] = useState(0);
+  const [chip, setChip] = useState<SetDelta | null>(null);
 
   // Reopening a committed row starts from what was stored, not from the ghost.
   // Seeded here rather than in an effect, so no cascading render is triggered.
   const beginEdit = () => {
+    if (readOnly) return;
     setDraft(draftFrom(committed));
     setEditing(true);
   };
@@ -84,6 +107,10 @@ export function SetRow({ index, unit, committed, ghost, prescription, onCommit }
     // Nothing to record — don't write an empty set just because ✓ was tapped.
     if (unit !== 'check' && set.weight == null && set.reps == null && set.seconds == null) return;
 
+    // Compare against the same set index last session before anything is written.
+    setChip(setDelta(set, ghost));
+    if (evaluatePR?.(set)) setSweepKey((k) => k + 1);
+
     onCommit(set);
     setDirty(false);
     setEditing(false);
@@ -102,13 +129,20 @@ export function SetRow({ index, unit, committed, ghost, prescription, onCommit }
     return () => clearTimeout(t);
   }, [dirty, draft]);
 
+  useEffect(() => {
+    if (!chip) return;
+    const t = setTimeout(() => setChip(null), CHIP_VISIBLE_MS);
+    return () => clearTimeout(t);
+  }, [chip]);
+
   const update = (patch: Draft) => {
     setDraft((d) => ({ ...d, ...patch }));
     setDirty(true);
   };
 
-  const showAsCommitted = isCommitted && !editing;
+  const showAsCommitted = readOnly || (isCommitted && !editing);
   const stepperCommitted = showAsCommitted;
+  const isPRSet = showAsCommitted && !!committed && !!evaluatePR?.(committed);
 
   return (
     <div className="relative mb-2">
@@ -119,6 +153,13 @@ export function SetRow({ index, unit, committed, ghost, prescription, onCommit }
           key={flashKey}
           aria-hidden
           className="stride-commit-flash pointer-events-none absolute inset-0 rounded-[10px]"
+        />
+      )}
+      {sweepKey > 0 && (
+        <div
+          key={`pr-${sweepKey}`}
+          aria-hidden
+          className="stride-pr-sweep pointer-events-none absolute inset-0 rounded-[10px]"
         />
       )}
 
@@ -202,13 +243,47 @@ export function SetRow({ index, unit, committed, ghost, prescription, onCommit }
 
         <CommitButton
           committed={showAsCommitted}
-          disabled={!showAsCommitted && !canCommit}
+          disabled={readOnly || (!showAsCommitted && !canCommit)}
           large={unit === 'check'}
           label={showAsCommitted ? `Edit set ${index + 1}` : `Log set ${index + 1}`}
           onClick={() => (showAsCommitted ? beginEdit() : commit())}
         />
+
+        {/* Feedback floats at the row's right edge, over the space a committed
+            row frees up when its stepper chrome retires. It never takes grid
+            width, so nothing reflows when the chip retires four seconds later. */}
+        {(isPRSet || chip) && (
+          <span className="pointer-events-none absolute inset-y-0 right-[46px] flex items-center gap-1.5">
+            {isPRSet && <PRTag />}
+            {chip && <DeltaChip delta={chip} />}
+          </span>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The delta against the same set index last session.
+ *
+ * A lighter set is muted, never red. Deloads are training, and an app that
+ * paints them as failure is telling the athlete to train through fatigue.
+ */
+function DeltaChip({ delta }: { delta: SetDelta }) {
+  const tone = delta.kind === 'up' ? 'text-accent' : 'text-muted';
+  return (
+    <span className={`stride-num font-mono text-[10px] uppercase tracking-[0.1em] ${tone}`}>
+      {delta.label}
+    </span>
+  );
+}
+
+/** Understated by design: a tag, not a trophy. */
+function PRTag() {
+  return (
+    <span className="rounded border border-[rgba(0,217,255,0.4)] bg-accent-tint px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-accent">
+      PR
+    </span>
   );
 }
 

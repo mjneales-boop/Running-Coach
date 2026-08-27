@@ -9,12 +9,16 @@ import {
   isCommitted,
   isExerciseComplete,
   isPR,
+  isSessionComplete,
+  isSessionSkipped,
   lastSessionSets,
   lowerLegInsurance,
   musclesFor,
   nextExerciseId,
   prescribedReps,
   primaryMuscle,
+  receiptLine,
+  sessionMuscleBreakdown,
   sessionDurationMin,
   sessionSetCount,
   sessionTonnage,
@@ -705,5 +709,95 @@ describe('prescribedReps', () => {
   it('returns undefined when there is no number to take', () => {
     expect(prescribedReps('AMRAP')).toBeUndefined();
     expect(prescribedReps('')).toBeUndefined();
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+
+describe('sessionMuscleBreakdown', () => {
+  const session = log('2026-08-24', 'chestback', {
+    'db-bench': [set(30, 10, T0), set(30, 10, T0)],   // chest
+    'pec-deck': [set(40, 12, T0)],                     // chest
+    'lat-pulldown': [set(50, 10, T0)],                 // back
+    'face-pull': [set(20, 15, T0)],                    // primary back
+    'cable-crunch': [set(20, 15, T0)],                 // core
+    'chest-sup-row': [{}],                             // uncommitted — must not appear
+  });
+
+  const breakdown = sessionMuscleBreakdown(session);
+
+  it('counts distinct exercises per group, ordered by sets', () => {
+    expect(breakdown).toEqual([
+      { muscle: 'chest', exercises: 2, sets: 3 },
+      { muscle: 'back', exercises: 2, sets: 2 },
+      { muscle: 'core', exercises: 1, sets: 1 },
+    ]);
+  });
+
+  it('places a two-muscle lift in its primary group only', () => {
+    expect(breakdown.some((b) => b.muscle === 'shoulders')).toBe(false);
+  });
+
+  it('omits groups with no committed work rather than showing empty rows', () => {
+    expect(breakdown.map((b) => b.muscle)).not.toContain('legs');
+  });
+
+  it('returns empty for a missing or empty log', () => {
+    expect(sessionMuscleBreakdown(undefined)).toEqual([]);
+    expect(sessionMuscleBreakdown(log('2026-08-24', 'chestback', {}))).toEqual([]);
+  });
+});
+
+describe('receiptLine', () => {
+  it('is stable for a given date, so reopening never reshuffles the words', () => {
+    expect(receiptLine('2026-08-24')).toBe(receiptLine('2026-08-24'));
+  });
+
+  it('varies across dates', () => {
+    const lines = new Set(
+      ['2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28'].map(receiptLine),
+    );
+    expect(lines.size).toBeGreaterThan(1);
+  });
+
+  it('never uses hype, emoji or celebratory punctuation', () => {
+    // Sweep enough dates to hit every line in the pool.
+    const lines = new Set<string>();
+    for (let d = 1; d <= 60; d++) lines.add(receiptLine(`2026-08-${String(d).padStart(2, '0')}`));
+
+    const banned = /crushed|smashed|beast|killed it|amazing|awesome|great job|!|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/iu;
+    for (const line of lines) expect(line).not.toMatch(banned);
+    expect(lines.size).toBeGreaterThan(3);
+  });
+});
+
+describe('session completion state', () => {
+  const exercises = [
+    { id: 'db-bench', sets: 2 },
+    { id: 'lat-pulldown', sets: 2 },
+  ];
+  const two = [set(30, 10, T0), set(30, 10, T0)];
+
+  it('is complete only when every exercise is finished', () => {
+    const partial = log('2026-08-24', 'chestback', { 'db-bench': two });
+    expect(isSessionComplete(partial, exercises)).toBe(false);
+
+    const full = log('2026-08-24', 'chestback', { 'db-bench': two, 'lat-pulldown': two });
+    expect(isSessionComplete(full, exercises)).toBe(true);
+  });
+
+  it('is not complete for a missing log or an empty session', () => {
+    expect(isSessionComplete(undefined, exercises)).toBe(false);
+    expect(isSessionComplete(log('2026-08-24', 'chestback', {}), [])).toBe(false);
+  });
+
+  it('distinguishes a stood-down session from an unlogged one', () => {
+    expect(isSessionSkipped(log('2026-08-24', 'chestback', {}))).toBe(false);
+    expect(
+      isSessionSkipped(
+        log('2026-08-24', 'chestback', {}, { skippedAt: '2026-08-24T09:00:00Z', skipReason: 'recovery' }),
+      ),
+    ).toBe(true);
   });
 });

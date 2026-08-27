@@ -889,3 +889,76 @@ export function prescribedReps(reps: string): number | undefined {
   const n = Number(match[0]);
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Session receipt
+// ---------------------------------------------------------------------------
+
+export interface MuscleBreakdownEntry {
+  muscle: MuscleGroup;
+  /** Distinct exercises worked in this group — one dot each on the receipt. */
+  exercises: number;
+  sets: number;
+}
+
+/**
+ * What the session actually hit, grouped by primary muscle and ordered by
+ * volume. Only groups with committed work appear — an empty group is not a
+ * finding, it is just noise on the receipt.
+ */
+export function sessionMuscleBreakdown(log: WorkoutLog | undefined): MuscleBreakdownEntry[] {
+  if (!log) return [];
+  const byGroup = new Map<MuscleGroup, { exercises: Set<string>; sets: number }>();
+
+  for (const [exerciseId, sets] of Object.entries(log.exercises ?? {})) {
+    const committed = (sets ?? []).filter(isCommitted);
+    if (committed.length === 0) continue;
+    const group = primaryMuscle(exerciseId);
+    const entry = byGroup.get(group) ?? { exercises: new Set<string>(), sets: 0 };
+    entry.exercises.add(exerciseId);
+    entry.sets += committed.length;
+    byGroup.set(group, entry);
+  }
+
+  return [...byGroup.entries()]
+    .map(([muscle, e]) => ({ muscle, exercises: e.exercises.size, sets: e.sets }))
+    .sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle));
+}
+
+/**
+ * Closing lines for the receipt.
+ *
+ * Magness-toned: strength work is support work, framed as durability and
+ * insurance against injury. Never hype, never "crushed it", no emoji, and
+ * nothing that implies the lifting is the point rather than the running.
+ */
+const RECEIPT_LINES = [
+  'Strength work is insurance. You just paid another premium.',
+  'That session did not make you faster. It made you harder to break.',
+  'Durability is built in the weeks nobody talks about. That was one.',
+  'The lifting protects the mileage. The mileage is the point.',
+  'Nothing dramatic happened. That is exactly what consistency looks like.',
+  'Tendons and connective tissue adapt slowly. You gave them another reason to.',
+  'This is the work that keeps you running in week sixteen.',
+] as const;
+
+/**
+ * Picks a closing line deterministically from the session date, so re-opening
+ * the same receipt never shuffles the words under the athlete.
+ */
+export function receiptLine(date: string): string {
+  let hash = 0;
+  for (let i = 0; i < date.length; i++) hash = (hash * 31 + date.charCodeAt(i)) >>> 0;
+  return RECEIPT_LINES[hash % RECEIPT_LINES.length];
+}
+
+/** True once every planned set of every exercise in the session is committed. */
+export function isSessionComplete(log: WorkoutLog | undefined, exercises: SessionExercise[]): boolean {
+  if (!log || exercises.length === 0) return false;
+  return exercises.every((ex) => isExerciseComplete(log, ex));
+}
+
+/** A session the athlete deliberately stood down, rather than one merely unlogged. */
+export function isSessionSkipped(log: WorkoutLog | undefined): boolean {
+  return !!log?.skippedAt;
+}

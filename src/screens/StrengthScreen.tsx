@@ -4,6 +4,9 @@ import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
 import { ExerciseCard } from '../components/strength/ExerciseCard';
 import { RestTimer } from '../components/strength/RestTimer';
+import { SessionHeader } from '../components/strength/SessionHeader';
+import { SessionStickyBar } from '../components/strength/SessionStickyBar';
+import { SessionReceipt } from '../components/strength/SessionReceipt';
 import { useCurrentDate } from '../hooks/useCurrentDate';
 import { usePlan } from '../hooks/usePlan';
 import { useSwaps } from '../hooks/useSwaps';
@@ -14,12 +17,30 @@ import { useSettings } from '../hooks/useSettings';
 import { WORKOUTS, restDefaultFor } from '../constants/workouts';
 import type { Exercise } from '../constants/workouts';
 import { getSessionExercises, getDefaultExercises } from '../lib/exercises';
-import { buildStrengthIndex, isCommitted, lastSessionSets, nextExerciseId } from '../lib/strength';
+import {
+  buildStrengthIndex,
+  compareToLastSession,
+  currentStreak,
+  isCommitted,
+  isPR,
+  isSessionComplete,
+  isSessionSkipped,
+  lastSessionSets,
+  nextExerciseId,
+  sessionDurationMin,
+  sessionMuscleBreakdown,
+  sessionSetCount,
+  sessionTonnage,
+  weeklyGymAdherence,
+} from '../lib/strength';
 import { applySwapsToWeek, applyGymOverrides, nextGymDay } from '../lib/logic';
 import type { Day, DayAbbr, SetLog } from '../types';
 
 /** Beat between the last set landing and the next exercise opening, so the commit is seen. */
 const AUTO_ADVANCE_MS = 400;
+
+/** Roughly the session header's height — past this, the sticky bar takes over. */
+const STICKY_AFTER_PX = 150;
 
 function localDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -56,7 +77,7 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
   const { swaps } = useSwaps();
   const { gymOverrides, moveGym } = useGymSchedule();
   const { exerciseOverrides, setSessionExercises } = useExerciseOverrides();
-  const { strength, commitSet, addSet } = useStrength();
+  const { strength, commitSet, addSet, markComplete, skipSession, unskipSession } = useStrength();
   const { settings } = useSettings();
   const [showDayPicker, setShowDayPicker] = useState(false);
 
@@ -109,6 +130,20 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
   const effectiveOpenId = openId ?? nextExerciseId(exercises, log) ?? exercises[0]?.id ?? null;
   const firstExerciseId = exercises[0]?.id;
 
+  // --- live session figures -------------------------------------------------
+
+  const setCount = sessionSetCount(log, exercises);
+  const tonnage = sessionTonnage(log);
+  const durationMin = sessionDurationMin(log);
+  const complete = isSessionComplete(log, exercises);
+  const skipped = isSessionSkipped(log);
+
+  // Editable today and for two days after; older sessions are a record, not a form.
+  const daysOld = Math.round(
+    (new Date(`${todayStr}T00:00:00`).getTime() - new Date(`${date}T00:00:00`).getTime()) / 86400000,
+  );
+  const readOnly = skipped || daysOld > 2;
+
   // Scroll a resumed session into view once per date. Skipped when the open card
   // is already the first one, which needs no scrolling.
   useEffect(() => {
@@ -126,6 +161,18 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
   // --- rest timer -----------------------------------------------------------
 
   const [rest, setRest] = useState<{ startedAt: number; durationSec: number } | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  // The receipt presents itself once when the last set lands. Reopening is
+  // manual after that, so it never ambushes an athlete editing a finished session.
+  const autoShownFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!complete || autoShownFor.current === date) return;
+    autoShownFor.current = date;
+    if (workoutId) markComplete(date, workoutId);
+    const t = setTimeout(() => setReceiptOpen(true), AUTO_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [complete, date, workoutId, markComplete]);
 
   // The clock is read inside the updater, which runs outside render — reading it
   // in the component body would be an impure call the compiler rightly rejects.
@@ -204,16 +251,54 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
     <div className="min-h-screen bg-canvas px-[22px] pb-[132px] pt-1.5">
       <ScreenHeader onAvatarClick={onOpenSettings} />
 
-      <div className="stride-rise mb-[22px] border-b border-hairline pb-[22px]">
-        <Eyebrow>{eyebrow}</Eyebrow>
-        {/* The tab bar already says Strength — the title's job is to name the session. */}
-        <h1
-          className="mt-3.5 font-display text-[40px] font-extrabold uppercase leading-[0.94] tracking-[-0.01em]"
-          style={{ fontVariationSettings: "'wdth' 118" }}
-        >
-          {workout.name}
-        </h1>
+      <div className="stride-rise">
+        <SessionHeader
+          eyebrow={eyebrow}
+          title={workout.name}
+          committed={setCount.committed}
+          planned={setCount.planned}
+          lifts={exercises.length}
+          tonnage={tonnage}
+          durationMin={durationMin}
+        />
       </div>
+
+      <SessionStickyBar
+        title={workout.name}
+        committed={setCount.committed}
+        planned={setCount.planned}
+        tonnage={tonnage}
+        showAfter={STICKY_AFTER_PX}
+      />
+
+      {skipped && (
+        <div className="stride-rise mb-5 rounded-2xl border border-hairline bg-surface px-[18px] py-4">
+          <Eyebrow>Skipped · recovery</Eyebrow>
+          <p className="mt-2 font-mono text-[11px] leading-[1.6] text-muted">
+            Stood down deliberately. Your streak is intact — backing off when you need to is
+            part of the plan, not a break in it.
+          </p>
+          <button
+            type="button"
+            onClick={() => unskipSession(date, workoutId)}
+            className="mt-3 min-h-[44px] rounded-lg border border-hairline-strong px-3 font-mono text-[10.5px] uppercase tracking-[0.1em] text-muted"
+          >
+            Log it after all
+          </button>
+        </div>
+      )}
+
+      {complete && !skipped && (
+        <div className="stride-rise mb-5">
+          <button
+            type="button"
+            onClick={() => setReceiptOpen(true)}
+            className="min-h-[44px] w-full rounded-xl border border-[rgba(0,217,255,0.3)] bg-accent-tint px-4 font-display text-[13px] font-bold uppercase tracking-[0.04em] text-accent"
+          >
+            Session complete · view receipt
+          </button>
+        </div>
+      )}
 
       {otherDays.length > 0 && (
         <div className="stride-rise mb-5">
@@ -252,6 +337,8 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
                 onToggleOpen={() => setOpenId(effectiveOpenId === exercise.id ? '' : exercise.id)}
                 onCommitSet={(i, set) => handleCommitSet(exercise, i, set)}
                 onAddSet={() => addSet(date, workoutId, exercise.id)}
+                readOnly={readOnly}
+                evaluatePR={(set) => isPR(index, exercise.id, set, date)}
                 alternatives={alternatives}
                 onSwap={(newId) => handleSwapExercise(exercise.id, newId)}
               />
@@ -259,6 +346,44 @@ export function StrengthScreen({ activeTab, onTabChange, onOpenSettings, focusDa
           );
         })}
       </div>
+
+      {!complete && !skipped && !readOnly && setCount.committed > 0 && (
+        <div className="stride-rise mt-6 flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => { if (workoutId) markComplete(date, workoutId); setReceiptOpen(true); }}
+            className="min-h-[44px] flex-1 rounded-xl border border-hairline-strong px-4 font-display text-[13px] font-bold uppercase tracking-[0.04em] text-ink"
+          >
+            Finish session
+          </button>
+        </div>
+      )}
+
+      {!complete && !skipped && !readOnly && (
+        <div className="stride-rise mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => skipSession(date, workoutId)}
+            className="min-h-[44px] px-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint"
+          >
+            Skip · recovery
+          </button>
+        </div>
+      )}
+
+      {receiptOpen && (
+        <SessionReceipt
+          workoutName={workout.name}
+          date={date}
+          tonnage={tonnage}
+          sets={setCount.committed}
+          durationMin={durationMin}
+          comparison={compareToLastSession(index, workoutId, date)}
+          streakWeeks={currentStreak(weeklyGymAdherence(weeks, strength, todayStr))}
+          muscles={sessionMuscleBreakdown(log)}
+          onClose={() => setReceiptOpen(false)}
+        />
+      )}
 
       {rest && (
         <RestTimer

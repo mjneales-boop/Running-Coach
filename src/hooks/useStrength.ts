@@ -191,6 +191,39 @@ export function useStrength() {
     [writeLog],
   );
 
+  /**
+   * Stands a scheduled session down for recovery.
+   *
+   * Deliberately not the same as "unlogged": a recovery skip is an honoured
+   * session and does not break the consistency streak. The app must never make
+   * backing off from fatigue feel like a failure.
+   */
+  const skipSession = useCallback(
+    (date: string, workoutId: string) => {
+      writeLog(date, workoutId, (log) => ({
+        ...log,
+        skippedAt: new Date().toISOString(),
+        skipReason: 'recovery',
+      }));
+    },
+    [writeLog],
+  );
+
+  /** Undoes a skip, for a session the athlete decides to do after all. */
+  const unskipSession = useCallback(
+    (date: string, workoutId: string) => {
+      writeLog(date, workoutId, (log) => {
+        // Clearing rather than destructuring: the fields must actually be
+        // removed so the row stops reading as skipped everywhere downstream.
+        const next = { ...log };
+        delete next.skippedAt;
+        delete next.skipReason;
+        return next;
+      });
+    },
+    [writeLog],
+  );
+
   const markExerciseDone = useCallback(
     (date: string, workoutId: string, exerciseId: string, done: boolean) => {
       writeLog(date, workoutId, (log) => ({
@@ -201,5 +234,15 @@ export function useStrength() {
     [writeLog],
   );
 
-  return { strength, loading: false, commitSet, addSet, markComplete, markExerciseDone, flushPending };
+  return {
+    strength,
+    loading: false,
+    commitSet,
+    addSet,
+    markComplete,
+    markExerciseDone,
+    skipSession,
+    unskipSession,
+    flushPending,
+  };
 }

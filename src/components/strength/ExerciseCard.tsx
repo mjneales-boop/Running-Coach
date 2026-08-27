@@ -18,6 +18,10 @@ interface ExerciseCardProps {
   onAddSet: () => void;
   alternatives?: Exercise[];
   onSwap?: (newExerciseId: string) => void;
+  /** A past or stood-down session is a record, not a form. */
+  readOnly?: boolean;
+  /** Whether a set would be an all-time best — drives the PR tag and sweep. */
+  evaluatePR?: (set: SetLog) => boolean;
 }
 
 function CheckBadge() {
@@ -79,13 +83,15 @@ export function ExerciseCard({
   onAddSet,
   alternatives = [],
   onSwap,
+  readOnly = false,
+  evaluatePR,
 }: ExerciseCardProps) {
   const [showSwapPicker, setShowSwapPicker] = useState(false);
 
   const rowCount = Math.max(exercise.sets, sets.length);
   const committedCount = sets.filter(isCommitted).length;
   const complete = committedCount >= exercise.sets && exercise.sets > 0;
-  const canSwap = !exercise.locked && alternatives.length > 0 && !!onSwap;
+  const canSwap = !readOnly && !exercise.locked && alternatives.length > 0 && !!onSwap;
   const reference = lastReference(exercise, lastSets);
 
   return (
@@ -187,11 +193,13 @@ export function ExerciseCard({
               committed={isCommitted(sets[i]) ? sets[i] : undefined}
               ghost={lastSets[i]}
               prescription={exercise.reps}
+              readOnly={readOnly}
+              evaluatePR={evaluatePR}
               onCommit={(set) => onCommitSet(i, set)}
             />
           ))}
 
-          {exercise.unit !== 'check' && (
+          {exercise.unit !== 'check' && !readOnly && (
             <button
               type="button"
               onClick={onAddSet}
