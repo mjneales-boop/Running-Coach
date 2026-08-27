@@ -36,7 +36,12 @@ const DEFAULT_SETTINGS: StrideSettings = {
 };
 
 export function useSettings() {
-  const [settings, write] = useStorage<StrideSettings>('stride-settings', DEFAULT_SETTINGS);
+  const [stored, write] = useStorage<StrideSettings>('stride-settings', DEFAULT_SETTINGS);
+
+  // useStorage replaces the value wholesale, so a blob written before a field existed
+  // comes back missing that field — and every caller reading it as a string crashes the
+  // screen. Merge over the defaults so newly added settings are always present.
+  const settings: StrideSettings = { ...DEFAULT_SETTINGS, ...stored };
 
   const update = (patch: Partial<StrideSettings>) => write({ ...settings, ...patch });
 

@@ -385,8 +385,12 @@ export interface PaceProgression {
  * way round — a half-typed or nonsensical value must fall back to the zone-derived
  * window rather than silently emptying the chart.
  */
-export function parseEasyRange(fast: string, slow: string): { fast: number; slow: number } | null {
-  const one = (raw: string): number | null => {
+export function parseEasyRange(
+  fast: string | null | undefined,
+  slow: string | null | undefined,
+): { fast: number; slow: number } | null {
+  const one = (raw: string | null | undefined): number | null => {
+    if (typeof raw !== 'string') return null;
     const m = raw.trim().match(/^(\d{1,2}):([0-5]\d)$/);
     if (!m) return null;
     const v = Number(m[1]) + Number(m[2]) / 60;
