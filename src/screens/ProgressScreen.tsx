@@ -27,11 +27,6 @@ function localDateKey(date: Date) {
 // Matches Strava's own history cap, which is what the first sync pulls (useAutoSync).
 const HR_WINDOW_DAYS = 90;
 
-function parsePace(pace: string): number {
-  const [m, s] = pace.split(':').map(Number);
-  return m + s / 60;
-}
-
 interface ProgressScreenProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
@@ -41,7 +36,7 @@ interface ProgressScreenProps {
 export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: ProgressScreenProps) {
   const today = useCurrentDate();
   const { currentWeekIndex, weeks } = usePlan(today, 0);
-  const { zones, peakKm, race } = usePlanConfig();
+  const { zones, peakKm } = usePlanConfig();
   const { completion } = useCompletion();
   const { strength } = useStrength();
   const [stravaActivities] = useStorage<Record<string, StravaActivity>>('marathon-strava', {});
@@ -52,8 +47,8 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
     [weeks, completion, currentWeekIndex, peakKm],
   );
   const pace = useMemo(
-    () => buildPaceProgression(weeks, Object.values(stravaActivities), zones, race.goalPace),
-    [weeks, stravaActivities, zones, race.goalPace],
+    () => buildPaceProgression(weeks, Object.values(stravaActivities), zones),
+    [weeks, stravaActivities, zones],
   );
   const lifts = useMemo(() => topLifts(strength, localDateKey(today)), [strength, today]);
   const hrEfficiency = useMemo(
@@ -84,7 +79,7 @@ export function ProgressScreen({ activeTab, onTabChange, onOpenSettings }: Progr
       />
 
       <VolumeBarChart volume={stats.volume} />
-      <PaceLineChart pace={pace} goalPaceMin={parsePace(race.goalPace)} />
+      <PaceLineChart pace={pace} />
       <HrEfficiencyChart zones={hrEfficiency} windowDays={HR_WINDOW_DAYS} />
       <TopLiftsList lifts={lifts} onOpenInsights={() => setInsightsOpen(true)} />
 

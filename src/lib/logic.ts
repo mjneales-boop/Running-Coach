@@ -356,35 +356,67 @@ function parsePaceToMinutes(pace: string): number {
 export interface PacePoint {
   weekId: string;
   label: string;
+  /** Distance-weighted average pace of the week's aerobic runs. Undefined if none. */
   actual?: number;
-  planned: number;
+  /** The Easy zone as [fast bound, slow bound] — the band `actual` should sit inside. */
+  band: [number, number];
 }
 
+export interface PaceProgression {
+  points: PacePoint[];
+  /** Fast end of the Easy zone (smaller number = quicker). */
+  easyLo: number;
+  /** Slow end of the Easy zone. */
+  easyHi: number;
+}
+
+/**
+ * Weekly aerobic pace against the Easy zone.
+ *
+ * The target here is a flat band, not a ramp toward marathon pace. Easy running
+ * stays easy for the whole block — it develops the aerobic base, and running it
+ * at MP is how athletes get hurt. A previous version drew a straight line from
+ * the Easy midpoint down to MP over the plan's length, which implied your easy
+ * runs should finish the block *at* race pace. They shouldn't.
+ *
+ * `actual` is distance-weighted (total time / total distance), so a 25 km long
+ * run counts for more than a 5 km shakeout, and it only counts runs that were
+ * plausibly meant to be aerobic — nothing quicker than the fast end of Steady
+ * (that's a workout) and nothing slower than the fast end of Recovery (that's a
+ * recovery jog). Both used to land in the average and swung it week to week on
+ * session mix rather than fitness.
+ */
 export function buildPaceProgression(
   weeks: Week[],
   activities: StravaActivity[],
   zones: Zone[],
-  goalPace: string,
-): PacePoint[] {
+): PaceProgression {
   const easyZone = zones.find((z) => z.name === 'Easy')!;
-  const [easyLo, easyHi] = easyZone.pace.split('–').map(parsePaceToMinutes);
-  const easyMid = (easyLo + easyHi) / 2;
-  const goalPaceMin = parsePaceToMinutes(goalPace);
+  const [easyLo, easyHi] = easyZone.pace.split('\u2013').map(parsePaceToMinutes);
   const steadyZone = zones.find((z) => z.name === 'Steady')!;
-  const steadyLo = parsePaceToMinutes(steadyZone.pace.split('–')[0]);
+  const recoveryZone = zones.find((z) => z.name === 'Recovery')!;
+  // Fast bound: anything quicker than this was a workout, not an easy run.
+  const fastBound = parsePaceToMinutes(steadyZone.pace.split('\u2013')[0]);
+  // Slow bound: anything slower than this was a recovery jog.
+  const slowBound = parsePaceToMinutes(recoveryZone.pace.split('\u2013')[0]);
 
-  return weeks.map((w, i) => {
-    const base = easyMid + (goalPaceMin - easyMid) * (i / (weeks.length - 1));
-    // Cutback weeks ease off (slightly slower); the peak week sharpens (slightly faster) —
-    // reflects the plan's real periodization instead of a flat ramp.
-    const periodizationOffset = w.cutback ? 0.12 : w.peak ? -0.08 : 0;
-    const planned = base + periodizationOffset;
+  const band: [number, number] = [easyLo, easyHi];
+
+  const points = weeks.map((w) => {
     const inWeek = activities.filter(
-      (a) => a.sportType === 'Run' && a.date >= w.dateStart && a.date <= w.dateEnd && a.avgPaceMinKm >= steadyLo,
+      (a) =>
+        a.sportType === 'Run' &&
+        a.date >= w.dateStart &&
+        a.date <= w.dateEnd &&
+        a.distanceKm > 0 &&
+        a.avgPaceMinKm >= fastBound &&
+        a.avgPaceMinKm <= slowBound,
     );
-    const actual = inWeek.length
-      ? Math.round((inWeek.reduce((s, a) => s + a.avgPaceMinKm, 0) / inWeek.length) * 100) / 100
-      : undefined;
-    return { weekId: w.id, label: w.num, actual, planned: Math.round(planned * 100) / 100 };
+    const km = inWeek.reduce((s, a) => s + a.distanceKm, 0);
+    const min = inWeek.reduce((s, a) => s + a.movingTimeSec / 60, 0);
+    const actual = km > 0 ? Math.round((min / km) * 100) / 100 : undefined;
+    return { weekId: w.id, label: w.num, actual, band };
   });
+
+  return { points, easyLo, easyHi };
 }
