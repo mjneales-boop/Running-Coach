@@ -87,8 +87,19 @@ export type GymOverrides = Record<string, GymOverrideEntry>;
 export interface SetLog {
   weight?: number;
   reps?: number;
+  /** Duration in seconds, for exercises whose unit is `time`. */
+  seconds?: number;
   done?: boolean;
+  /**
+   * Epoch ms of the explicit commit. Additive — logs written before this field
+   * existed have none, and are treated as committed at the parent log's date.
+   * Also what separates a real set from a ghost prefill, which is never stored.
+   */
+  committedAt?: number;
 }
+
+/** Why a scheduled gym session did not happen. Recovery skips never break a streak. */
+export type SkipReason = 'recovery';
 
 export interface WorkoutLog {
   workoutId: string;
@@ -96,6 +107,9 @@ export interface WorkoutLog {
   exercises: Record<string, SetLog[]>;
   exerciseDone?: Record<string, boolean>;
   completedAt?: string;
+  /** ISO timestamp the athlete deliberately stood the session down. */
+  skippedAt?: string;
+  skipReason?: SkipReason;
 }
 
 export interface SessionExerciseConfig {
