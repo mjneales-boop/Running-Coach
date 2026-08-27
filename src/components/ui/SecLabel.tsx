@@ -27,7 +27,7 @@ export function SecLabel({ children, action, style, className }: SecLabelProps) 
         ...style,
       }}
     >
-      <span>{'// ' + children}</span>
+      <span>{children}</span>
       {action}
     </div>
   );
