@@ -28,7 +28,19 @@ import type { Week, Zone } from '../src/types';
 /** Nothing dated before this may change. Weeks pre1–w7 are history. */
 const CUTOVER = '2026-08-10';
 const EXPECTED_WEEK_IDS = ['w8', 'w9', 'w10', 'w11', 'w12', 'w13', 'w14', 'w15', 'w16'];
-const EXPECTED_TARGETS = [42, 60, 64, 68, 48, 60, 50, 38, 22];
+
+/**
+ * The weeks THIS rewrite actually changes. The stale-override sweep is scoped to
+ * these, not to everything past CUTOVER: w8–w10 are already run, and their gym
+ * overrides, swaps and exercise overrides are history, not stale pointers into a
+ * layout that moved. Sweeping them would be collateral data loss.
+ */
+const REWRITTEN_WEEK_IDS = ['w11', 'w12', 'w13'];
+const REWRITE_START = '2026-08-31';  // w11 Monday
+const REWRITE_END = '2026-09-20';    // w13 Sunday
+// Sep 2026 quad-contusion rewrite: w11 68→23 (return-to-run week, peak flag moved),
+// w12 48→46 (rebuild). w13 keeps 60 and is now the peak. Nothing else moved.
+const EXPECTED_TARGETS = [42, 60, 64, 23, 46, 60, 50, 38, 22];
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 /** Transcribed from the club schedule. A typo here fails the run rather than shipping. */
@@ -107,9 +119,11 @@ function verify(kept: Week[], incoming: Week[], zones: Zone[], liveZones: Zone[]
   }));
   check(eq(actual, EXPECTED_FIXTURES), 'all known fixtures match date/time/opponent/venue', `${actual.length}/${EXPECTED_FIXTURES.length}`);
 
-  const longWeeks = incoming.filter((w) => !w.race);
+  // w11 is a return-to-run week with no long run at all, so the guard asks the
+  // question that actually matters: any week that HAS a long run has it on Tuesday.
+  const longWeeks = incoming.filter((w) => !w.race && w.days.some((d) => d.type === 'LONG'));
   const tueLongs = longWeeks.filter((w) => w.days.find((d) => d.type === 'LONG')?.d === 'tue');
-  check(tueLongs.length === longWeeks.length, 'long run sits on Tuesday, weeks 8–15', `${tueLongs.length}/${longWeeks.length}`);
+  check(tueLongs.length === longWeeks.length, 'every long run sits on Tuesday', `${tueLongs.length}/${longWeeks.length} weeks with a long run`);
 
   const satFixtureWeeks = incoming.filter((w) => w.days.some((d) => d.type === 'GAME' && d.d === 'sat'));
   const noWorkout = satFixtureWeeks.filter((w) => !w.days.some((d) => d.type === 'WORKOUT'));
@@ -244,7 +258,9 @@ async function main() {
     const { data } = await admin.from('user_blobs').select('value').eq('user_id', userId).eq('resource', resource).maybeSingle();
     const value = (data?.value ?? null) as Record<string, unknown> | null;
     if (!value) { console.log(`  ${resource.padEnd(19)} absent`); continue; }
-    const stale = Object.keys(value).filter((k) => (resource === 'swaps' ? EXPECTED_WEEK_IDS.includes(k) : k >= CUTOVER));
+    const stale = Object.keys(value).filter((k) =>
+      resource === 'swaps' ? REWRITTEN_WEEK_IDS.includes(k) : k >= REWRITE_START && k <= REWRITE_END,
+    );
     console.log(`  ${resource.padEnd(19)} ${stale.length} stale key(s)${stale.length ? `: ${stale.join(', ')}` : ''}`);
     if (stale.length) {
       const cleaned = Object.fromEntries(Object.entries(value).filter(([k]) => !stale.includes(k)));
@@ -252,7 +268,7 @@ async function main() {
     }
   }
 
-  const completionKeys = incoming.flatMap((w) => w.days.map((d) => `${w.id}-${d.d}`));
+  const completionKeys = incoming.filter((w) => REWRITTEN_WEEK_IDS.includes(w.id)).flatMap((w) => w.days.map((d) => `${w.id}-${d.d}`));
   const { data: hits } = await admin.from('completions').select('key').eq('user_id', userId).in('key', completionKeys);
   const staleCompletions = (hits ?? []).map((r) => r.key as string);
   console.log(`  completions         ${staleCompletions.length} logged in the affected weeks${staleCompletions.length ? `: ${staleCompletions.join(', ')}` : ''}`);
