@@ -25,6 +25,9 @@ export interface Day {
   strides?: string;
   gym?: string;
   workoutId?: string;
+  /** Opts the day into a rehab protocol (src/constants/rehab.ts). Independent of
+   *  `workoutId`: a day can carry both a real lift and a rehab routine. */
+  rehabId?: string;
   notes?: string;
   chartPace?: { category: WorkoutPaceCategory; secPerKm: number };
   fixture?: Fixture;

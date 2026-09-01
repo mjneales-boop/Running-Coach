@@ -28,6 +28,7 @@ const daySchema = z.object({
   strides: z.string().optional(),
   gym: z.string().optional(),
   workoutId: z.enum(['chestback', 'shouldersarms', 'legs']).optional(),
+  rehabId: z.enum(['quad']).optional(),
   notes: z.string().optional(),
   chartPace: z
     .object({

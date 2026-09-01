@@ -6,6 +6,7 @@ import { WeekProgressCard } from '../components/daily/WeekProgressCard';
 import { StrengthLinkCard } from '../components/daily/StrengthLinkCard';
 import { LastRunCard } from '../components/daily/LastRunCard';
 import { PostRunSummaryCard } from '../components/daily/PostRunSummaryCard';
+import { RehabCard } from '../components/daily/RehabCard';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { Eyebrow } from '../components/ui/Eyebrow';
 import { TabBar, type TabKey } from '../components/ui/TabBar';
@@ -163,6 +164,8 @@ export function DailyScreen({
           />
         )
       )}
+
+      {todaySession?.rehabId && <RehabCard rehabId={todaySession.rehabId} date={todaySession.date} />}
 
       {todayDone && todaySession && ['LONG', 'WORKOUT', 'EASY'].includes(todaySession.type) && (
         <PostRunSummaryCard
